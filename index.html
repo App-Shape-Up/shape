@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0e7ad1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Shape">
+<title>Shape</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- Tela de entrar / criar conta -->
+<main id="tela-login" class="escondido">
+  <div class="login-topo">
+    <img src="icons/icon.svg" alt="" width="64" height="64">
+    <h1>Shape</h1>
+    <p class="muted">Seu controle de saúde: água, e em breve treinos, dieta e hábitos.</p>
+  </div>
+  <form id="form-login" class="card">
+    <label>E-mail<input id="email" type="email" autocomplete="email" required></label>
+    <label>Senha<input id="senha" type="password" autocomplete="current-password" minlength="6" required></label>
+    <button class="primario" type="submit" id="btn-entrar">Entrar</button>
+    <button class="link" type="button" id="btn-alternar">Não tem conta? Criar conta</button>
+    <p class="msg" id="msg-login"></p>
+  </form>
+</main>
+
+<!-- App -->
+<main id="tela-app" class="escondido carregando">
+  <header>
+    <div>
+      <h1>💧 Água</h1>
+      <div class="muted pequeno" id="data-hoje"></div>
+    </div>
+    <button class="link" id="btn-sair">Sair</button>
+  </header>
+  <div class="faixa-demo escondido" id="faixa-demo">Modo demonstração: os dados ficam só neste aparelho.</div>
+
+  <section class="card">
+    <div class="progresso">
+      <div class="anel">
+        <svg width="132" height="132" viewBox="0 0 132 132" aria-hidden="true">
+          <circle cx="66" cy="66" r="56" fill="none" stroke="var(--accent-soft)" stroke-width="14"/>
+          <circle id="arco" cx="66" cy="66" r="56" fill="none" stroke="var(--accent)" stroke-width="14"
+                  stroke-linecap="round" stroke-dasharray="351.86" stroke-dashoffset="351.86"/>
+        </svg>
+        <div class="centro"><div class="pct" id="pct">0%</div><div class="muted pequeno">da meta</div></div>
+      </div>
+      <div>
+        <div class="total" id="total">0 ml</div>
+        <div class="muted" id="meta">meta: —</div>
+        <div class="falta" id="falta"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Adicionar</h2>
+    <div class="botoes">
+      <button data-ml="200">200 ml</button>
+      <button data-ml="300">300 ml</button>
+      <button data-ml="500">500 ml</button>
+      <button data-ml="750">750 ml</button>
+    </div>
+    <div class="linha">
+      <input id="outro" type="number" inputmode="numeric" placeholder="Outra quantidade (ml)" min="1" max="5000">
+      <button class="primario" id="add-outro">Adicionar</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Hoje</h2>
+    <ul id="lista"></ul>
+  </section>
+
+  <section class="card">
+    <h2>Últimos 7 dias</h2>
+    <div class="semana" id="semana"></div>
+    <div class="muted pequeno legenda">Verde = bateu a meta daquele dia</div>
+  </section>
+
+  <section class="card">
+    <h2>Meta diária</h2>
+    <div class="linha sem-margem">
+      <input id="nova-meta" type="number" inputmode="numeric" placeholder="ex.: 3000" min="250" max="10000">
+      <button class="primario" id="salvar-meta">Salvar</button>
+    </div>
+  </section>
+</main>
+
+<div class="aviso" id="aviso" role="status"></div>
+
+<script src="config.js"></script>
+<script src="vendor/supabase.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
