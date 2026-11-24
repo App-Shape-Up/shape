@@ -49,8 +49,12 @@ input {
 .login-topo { text-align: center; margin: 40px 0 24px; }
 .login-topo img { border-radius: 16px; }
 .login-topo h1 { font-size: 28px; margin-top: 8px; }
-#form-login { display: flex; flex-direction: column; gap: 14px; }
-#form-login label { display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: var(--muted); }
+.login-card { display: flex; flex-direction: column; gap: 14px; }
+.login-card p { margin: 0; text-align: center; }
+button.google { display: flex; align-items: center; justify-content: center; gap: 10px; background: var(--card); color: var(--text);
+  border: 1px solid var(--line); padding: 14px; font-weight: 600; }
+.status { color: var(--muted); margin: -8px 0 12px; display: flex; justify-content: space-between; gap: 8px; }
+.status .pend { color: var(--accent); }
 .msg { margin: 0; font-size: 14px; min-height: 1em; }
 .msg.erro { color: var(--danger); }
 
@@ -92,6 +96,4 @@ li.vazio { color: var(--muted); font-size: 14px; }
 }
 .aviso.ver { opacity: 1; }
 .carregando { opacity: .55; pointer-events: none; }
-
-#form-login label.ver-senha { flex-direction: row; align-items: center; gap: 8px; }
-#form-login label.ver-senha input { width: auto; }
+.status a { color: var(--accent); text-decoration: none; font-weight: 500; }
