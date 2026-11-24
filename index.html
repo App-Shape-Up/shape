@@ -20,7 +20,7 @@
   <div class="login-topo">
     <img src="icons/icon.svg" alt="" width="64" height="64">
     <h1>Shape</h1>
-    <p class="muted">Seu controle de saúde: água, e em breve treinos, dieta e hábitos.</p>
+    <p class="muted">Seu controle de saúde: água, treinos e, em breve, dieta e suplementação.</p>
   </div>
   <div class="card login-card">
     <button class="google" type="button" id="btn-google">
@@ -33,68 +33,229 @@
 </main>
 
 <!-- App -->
-<main id="tela-app" class="escondido carregando">
+<div id="tela-app" class="escondido carregando">
+  <nav class="menu" aria-label="Seções">
+    <div class="menu-marca"><img src="icons/icon.svg" alt="" width="28" height="28"> Shape</div>
+    <button data-ir="painel"><span class="ic">📊</span><span>Painel</span></button>
+    <button data-ir="perfil"><span class="ic">👤</span><span>Perfil</span></button>
+    <button data-ir="treinos"><span class="ic">🏋️</span><span>Treinos</span></button>
+    <button data-ir="dieta"><span class="ic">🥗</span><span>Dieta</span></button>
+    <button data-ir="hidratacao"><span class="ic">💧</span><span>Hidratação</span></button>
+    <button data-ir="suplementacao"><span class="ic">💊</span><span>Suplem.</span></button>
+  </nav>
+
+  <main>
   <header>
     <div>
-      <h1>💧 Água</h1>
+      <h1 id="titulo-secao">Shape</h1>
       <div class="muted pequeno" id="data-hoje"></div>
     </div>
-    <button class="link" id="btn-sair">Sair</button>
   </header>
   <div class="status pequeno" id="status"></div>
   <div class="faixa-demo escondido" id="faixa-demo">Modo demonstração: os dados ficam só neste aparelho.</div>
 
-  <section class="card">
-    <div class="progresso">
-      <div class="anel">
-        <svg width="132" height="132" viewBox="0 0 132 132" aria-hidden="true">
-          <circle cx="66" cy="66" r="56" fill="none" stroke="var(--accent-soft)" stroke-width="14"/>
-          <circle id="arco" cx="66" cy="66" r="56" fill="none" stroke="var(--accent)" stroke-width="14"
-                  stroke-linecap="round" stroke-dasharray="351.86" stroke-dashoffset="351.86"/>
-        </svg>
-        <div class="centro"><div class="pct" id="pct">0%</div><div class="muted pequeno">da meta</div></div>
+  <!-- ===== Painel ===== -->
+  <div data-secao="painel" class="escondido">
+    <div class="filtro">
+      <label for="analise" class="muted pequeno">O que analisar</label>
+      <select id="analise">
+        <option value="agua">💧 Consumo de água</option>
+        <option disabled>🏋️ Treinos (em breve)</option>
+        <option disabled>🥗 Dieta (em breve)</option>
+        <option disabled>💊 Suplementação (em breve)</option>
+      </select>
+    </div>
+
+    <div class="card destaque escondido" id="aviso-perfil">
+      <div>Preencha seu <b>peso no Perfil</b> para o app calcular suas metas de água. Até lá, uso a meta fixa antiga.</div>
+      <button class="primario" data-ir="perfil">Abrir Perfil</button>
+    </div>
+
+    <div class="grade-painel">
+      <section class="card">
+        <h2>Hoje</h2>
+        <div class="progresso">
+          <div class="anel">
+            <svg width="132" height="132" viewBox="0 0 132 132" aria-hidden="true">
+              <circle cx="66" cy="66" r="56" fill="none" class="trilho" stroke-width="14"/>
+              <circle id="p-arco" cx="66" cy="66" r="56" fill="none" class="arco" stroke-width="14" transform="rotate(-90 66 66)"
+                      stroke-linecap="round" stroke-dasharray="351.86" stroke-dashoffset="351.86"/>
+              <g id="p-marca"><line x1="66" y1="2" x2="66" y2="22" class="marca"/></g>
+            </svg>
+            <div class="centro"><div class="pct" id="p-pct">0%</div><div class="muted pequeno">da meta</div></div>
+          </div>
+          <div class="resumo-hoje">
+            <div class="total" id="p-total">0 ml</div>
+            <div class="muted pequeno" id="p-de"></div>
+            <div id="p-situacao" class="espaco"></div>
+          </div>
+        </div>
+        <div class="metas-linha">
+          <div><span class="amostra min"></span>Mínima <b id="p-min">—</b></div>
+          <div><span class="amostra rec"></span>Recomendada <b id="p-rec">—</b></div>
+        </div>
+        <div class="muted pequeno" id="p-falta"></div>
+        <div class="muted pequeno legenda">Abaixo da mínima = ruim · entre as duas = bom · bateu a recomendada = excelente. O tracinho no anel marca a mínima.</div>
+      </section>
+
+      <section class="card">
+        <h2 id="m-titulo">Este mês</h2>
+        <div id="m-situacao"></div>
+        <div class="muted pequeno espaco" id="m-periodo"></div>
+        <dl class="numeros">
+          <div><dt>Consumido</dt><dd id="m-total">—</dd></div>
+          <div><dt>Meta mínima do mês</dt><dd id="m-meta-min">—</dd></div>
+          <div><dt>Meta recomendada do mês</dt><dd id="m-meta-rec">—</dd></div>
+        </dl>
+        <div class="dias-meta">
+          <div class="dias-linha"><span>Dias na mínima ou acima</span><b id="m-dias-min">—</b></div>
+          <div class="trilha"><div class="enche min" id="m-barra-min"></div></div>
+          <div class="dias-linha"><span>Dias na recomendada</span><b id="m-dias-rec">—</b></div>
+          <div class="trilha"><div class="enche rec" id="m-barra-rec"></div></div>
+        </div>
+      </section>
+    </div>
+
+    <section class="card">
+      <h2>Última semana</h2>
+      <div class="legenda-grafico">
+        <span><span class="amostra consumo"></span>Consumo</span>
+        <span><span class="amostra rec tracejada"></span>Recomendada</span>
+        <span><span class="amostra min tracejada"></span>Mínima</span>
       </div>
-      <div>
-        <div class="total" id="total">0 ml</div>
-        <div class="muted" id="meta">meta: —</div>
-        <div class="falta" id="falta"></div>
+      <div class="grafico" id="grafico-semana"><div class="dica" id="dica-semana" role="status"></div></div>
+      <div class="muted pequeno legenda">Toque ou passe o mouse no gráfico para ver os valores de cada dia. A tabela dia a dia fica em Hidratação.</div>
+    </section>
+  </div>
+
+  <!-- ===== Hidratação ===== -->
+  <div data-secao="hidratacao" class="escondido">
+    <section class="card">
+      <h2>Metas de hoje</h2>
+      <div class="metas-hoje">
+        <div><div class="muted pequeno"><span class="amostra min"></span>Mínima</div><div class="grande" id="h-minima">—</div><div class="muted pequeno" id="h-conta-min"></div></div>
+        <div><div class="muted pequeno"><span class="amostra rec"></span>Recomendada</div><div class="grande" id="h-recomendada">—</div><div class="muted pequeno" id="h-conta-rec"></div></div>
       </div>
-    </div>
-  </section>
+      <div class="pequeno espaco" id="h-adicional"></div>
+      <div class="pequeno espaco escondido" id="h-sem-perfil">Preencha o peso no <button class="link" data-ir="perfil">Perfil</button> para calcular as metas.</div>
+    </section>
 
-  <section class="card">
-    <h2>Adicionar</h2>
-    <div class="botoes">
-      <button data-ml="200">200 ml</button>
-      <button data-ml="300">300 ml</button>
-      <button data-ml="500">500 ml</button>
-      <button data-ml="750">750 ml</button>
-    </div>
-    <div class="linha">
-      <input id="outro" type="number" inputmode="numeric" placeholder="Outra quantidade (ml)" min="1" max="5000">
-      <button class="primario" id="add-outro">Adicionar</button>
-    </div>
-  </section>
+    <section class="card">
+      <h2>Adicionar</h2>
+      <div class="botoes">
+        <button data-ml="200">200 ml</button>
+        <button data-ml="300">300 ml</button>
+        <button data-ml="500">500 ml</button>
+        <button data-ml="750">750 ml</button>
+      </div>
+      <div class="linha">
+        <input id="outro" type="number" inputmode="numeric" placeholder="Outra quantidade (ml)" min="1" max="5000">
+        <button class="primario" id="add-outro">Adicionar</button>
+      </div>
+    </section>
 
-  <section class="card">
-    <h2>Hoje</h2>
-    <ul id="lista"></ul>
-  </section>
+    <section class="card">
+      <h2>Inserções de hoje</h2>
+      <table class="tabela">
+        <thead><tr><th>Hora</th><th class="num">Quantidade</th><th></th></tr></thead>
+        <tbody id="tab-insercoes"></tbody>
+        <tfoot><tr><th>Total</th><th class="num" id="tot-insercoes">0 ml</th><th></th></tr></tfoot>
+      </table>
+    </section>
 
-  <section class="card">
-    <h2>Últimos 7 dias</h2>
-    <div class="semana" id="semana"></div>
-    <div class="muted pequeno legenda">Verde = bateu a meta daquele dia</div>
-  </section>
+    <section class="card">
+      <h2>Totais por dia x metas</h2>
+      <div class="rolar">
+        <table class="tabela">
+          <thead><tr><th>Dia</th><th class="num">Total</th><th class="num">Mínima</th><th class="num">Recom.</th><th>Situação</th></tr></thead>
+          <tbody id="tab-totais"></tbody>
+        </table>
+      </div>
+      <div class="muted pequeno legenda">Últimos 14 dias, a partir do primeiro registro.</div>
+    </section>
+  </div>
 
-  <section class="card">
-    <h2>Meta diária</h2>
-    <div class="linha sem-margem">
-      <input id="nova-meta" type="number" inputmode="numeric" placeholder="ex.: 3000" min="250" max="10000">
-      <button class="primario" id="salvar-meta">Salvar</button>
-    </div>
-  </section>
-</main>
+  <!-- ===== Treinos ===== -->
+  <div data-secao="treinos" class="escondido">
+    <section class="card">
+      <h2>Registrar treino</h2>
+      <form id="form-treino" class="formulario">
+        <div class="segmentado" role="group" aria-label="Tipo de treino">
+          <button type="button" data-tipo="musculacao" aria-pressed="true">🏋️ Musculação</button>
+          <button type="button" data-tipo="cardio" aria-pressed="false">🏃 Cárdio</button>
+        </div>
+        <div class="duas">
+          <label>Dia<input id="t-dia" type="date"></label>
+          <label>Minutos<input id="t-minutos" type="number" inputmode="numeric" min="1" max="600" placeholder="ex.: 50"></label>
+        </div>
+        <button class="primario" type="submit">Salvar treino</button>
+      </form>
+      <div class="muted pequeno legenda">O treino de um dia aumenta a meta recomendada de água do dia seguinte. Fez musculação e cárdio? Registre os dois.</div>
+    </section>
+    <section class="card">
+      <h2>Treinos recentes</h2>
+      <ul id="lista-treinos"></ul>
+    </section>
+  </div>
+
+  <!-- ===== Dieta / Suplementação ===== -->
+  <div data-secao="dieta" class="escondido">
+    <section class="card em-breve"><div class="ic-grande">🥗</div><b>Dieta chega na próxima versão.</b><div class="muted pequeno">Aqui você vai registrar refeições e acompanhar sua alimentação.</div></section>
+  </div>
+  <div data-secao="suplementacao" class="escondido">
+    <section class="card em-breve"><div class="ic-grande">💊</div><b>Suplementação chega na próxima versão.</b><div class="muted pequeno">Aqui você vai marcar os suplementos do dia.</div></section>
+  </div>
+
+  <!-- ===== Perfil ===== -->
+  <div data-secao="perfil" class="escondido">
+    <section class="card">
+      <h2>Seus dados</h2>
+      <form id="form-perfil" class="formulario">
+        <div class="duas">
+          <label>Idade<input id="p-idade" type="number" inputmode="numeric" min="5" max="120" placeholder="anos"></label>
+          <label>Peso (kg)<input id="p-peso_kg" type="number" inputmode="decimal" step="0.1" min="20" max="300" placeholder="ex.: 78,5" required></label>
+        </div>
+        <div class="duas">
+          <label>Altura (cm)<input id="p-altura_cm" type="number" inputmode="numeric" min="80" max="250" placeholder="ex.: 175"></label>
+          <label>Tempo de treino
+            <select id="p-tempo_treino">
+              <option value="">—</option>
+              <option>Não treino</option>
+              <option>Menos de 6 meses</option>
+              <option>6 meses a 1 ano</option>
+              <option>1 a 3 anos</option>
+              <option>3 a 5 anos</option>
+              <option>Mais de 5 anos</option>
+            </select>
+          </label>
+        </div>
+        <label>Condicionamento
+          <select id="p-condicionamento">
+            <option value="">—</option>
+            <option>Sedentário</option><option>Iniciante</option><option>Intermediário</option><option>Avançado</option><option>Atleta</option>
+          </select>
+        </label>
+        <label>Objetivo
+          <select id="p-objetivo">
+            <option value="">—</option>
+            <option>Desempenho</option><option>Emagrecimento</option><option>Força</option><option>Funcionalidade</option><option>Hipertrofia</option>
+          </select>
+        </label>
+        <button class="primario" type="submit">Salvar perfil</button>
+        <div class="muted pequeno" id="perfil-info"></div>
+      </form>
+    </section>
+    <section class="card">
+      <h2>Conta</h2>
+      <div class="conta">
+        <div id="conta-email"></div>
+        <a id="link-planilha" class="escondido" target="_blank" rel="noopener">Abrir minha planilha</a>
+        <button class="link" id="btn-sair">Sair</button>
+      </div>
+    </section>
+  </div>
+  </main>
+</div>
 
 <div class="aviso" id="aviso" role="status"></div>
 
