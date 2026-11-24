@@ -1,5 +1,5 @@
 // Guarda os arquivos do app para abrir rápido. Sempre tenta a versão nova primeiro.
-const CACHE = 'shape-v1-1795499093';
+const CACHE = 'shape-v2-1795499999';
 const ARQUIVOS = ['./', 'index.html', 'styles.css', 'app.js', 'config.js', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-180.png', 'vendor/supabase.js'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ARQUIVOS))); self.skipWaiting(); });
 self.addEventListener('activate', (e) => {

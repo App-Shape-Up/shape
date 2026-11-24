@@ -23,8 +23,9 @@
     <p class="muted">Seu controle de saúde: água, e em breve treinos, dieta e hábitos.</p>
   </div>
   <form id="form-login" class="card">
-    <label>E-mail<input id="email" type="email" autocomplete="email" required></label>
-    <label>Senha<input id="senha" type="password" autocomplete="current-password" minlength="6" required></label>
+    <label>E-mail<input id="email" type="email" autocomplete="email" autocapitalize="none" autocorrect="off" spellcheck="false" required></label>
+    <label>Senha<input id="senha" type="password" autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false" minlength="6" required></label>
+    <label class="ver-senha"><input type="checkbox" id="ver-senha"> Mostrar senha</label>
     <button class="primario" type="submit" id="btn-entrar">Entrar</button>
     <button class="link" type="button" id="btn-alternar">Não tem conta? Criar conta</button>
     <p class="msg" id="msg-login"></p>

@@ -43,6 +43,11 @@ create policy "dono" on public.metas
   for all to authenticated
   using (user_id = auth.uid()) with check (user_id = auth.uid());
 
+-- ---------- Permissões da API ----------
+-- Alguns projetos novos do Supabase não liberam tabelas novas para o app automaticamente.
+grant usage on schema public to anon, authenticated;
+grant select, insert, update, delete on public.agua_registros, public.metas to authenticated;
+
 -- ---------- Visão pronta para painéis ----------
 -- Total por dia + meta válida naquele dia + se bateu. Respeita a segurança de quem consulta.
 create or replace view public.agua_por_dia with (security_invoker = true) as
@@ -61,3 +66,7 @@ left join lateral (
   limit 1
 ) m on true
 group by r.user_id, r.dia, m.valor;
+grant select on public.agua_por_dia to authenticated;
+
+-- Avisa a API do Supabase que as tabelas mudaram (evita o erro "schema cache").
+notify pgrst, 'reload schema';

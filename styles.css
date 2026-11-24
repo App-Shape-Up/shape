@@ -92,3 +92,6 @@ li.vazio { color: var(--muted); font-size: 14px; }
 }
 .aviso.ver { opacity: 1; }
 .carregando { opacity: .55; pointer-events: none; }
+
+#form-login label.ver-senha { flex-direction: row; align-items: center; gap: 8px; }
+#form-login label.ver-senha input { width: auto; }

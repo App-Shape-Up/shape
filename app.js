@@ -33,6 +33,8 @@
     if (/already registered/i.test(m)) return 'Esse e-mail já tem conta. Use "Entrar".';
     if (/Password should be/i.test(m)) return 'A senha precisa ter pelo menos 6 caracteres.';
     if (/Failed to fetch|NetworkError/i.test(m)) return 'Sem conexão com a internet.';
+    if (/schema cache|does not exist|relation .* not found/i.test(m)) return 'O banco ainda não tem as tabelas. Rode o arquivo schema.sql no SQL Editor do Supabase.';
+    if (/permission denied/i.test(m)) return 'O banco recusou o acesso. Rode de novo o arquivo schema.sql no SQL Editor do Supabase.';
     return m;
   }
 
@@ -118,7 +120,7 @@
   $('form-login').onsubmit = async (ev) => {
     ev.preventDefault();
     const msg = $('msg-login'); msg.className = 'msg'; msg.textContent = 'Aguarde...';
-    const email = $('email').value.trim(), senha = $('senha').value;
+    const email = $('email').value.trim().toLowerCase(), senha = $('senha').value;
     try {
       if (criando) {
         const r = await banco.criarConta(email, senha);
@@ -130,6 +132,7 @@
       abrirApp();
     } catch (e) { msg.className = 'msg erro'; msg.textContent = msgErro(e); }
   };
+  $('ver-senha').onchange = () => { $('senha').type = $('ver-senha').checked ? 'text' : 'password'; };
   $('btn-sair').onclick = async () => { await banco.sair(); mostrar('login'); };
 
   // ---------- Módulo Água ----------
