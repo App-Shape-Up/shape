@@ -2,5 +2,5 @@
 // ele só identifica o app; quem decide o acesso é a própria pessoa, ao entrar com a conta Google dela.
 // Vazio = MODO DEMONSTRAÇÃO (dados só neste navegador).
 window.SHAPE_CONFIG = {
-  googleClientId: '',
+  googleClientId: '181435584704-vbc669jmhutcdi0ab6otp0b5k2a2uema.apps.googleusercontent.com',
 };
