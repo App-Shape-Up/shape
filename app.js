@@ -1,4 +1,5 @@
-/* Shape — app pessoal de saúde. Versão 2: menu de seções, perfil, treinos e hidratação com metas calculadas.
+/* ShapeUp — app pessoal de saúde. Versão 3: novo visual (verde escuro), tela inicial com cadastros e registro diário,
+ * meta de água ajustável no dia, tabela mensal de consumo e backup por e-mail.
  *
  * Onde ficam os dados: numa planilha "Shape - dados" no Google Drive de cada pessoa.
  * Não existe servidor nosso: o navegador conversa direto com o Google.
@@ -19,11 +20,23 @@
     Agua:    ['id', 'dia', 'quantidade_ml', 'registrado_em'],
     Metas:   ['id', 'modulo', 'tipo', 'valor', 'unidade', 'valida_desde', 'registrado_em'],
     Perfil:  ['id', 'idade', 'peso_kg', 'altura_cm', 'tempo_treino', 'condicionamento', 'objetivo', 'registrado_em'],
-    Treinos: ['id', 'dia', 'tipo', 'minutos', 'registrado_em'],
+    Treinos: ['id', 'dia', 'tipo', 'minutos', 'registrado_em', 'treino_id'],
+    // Cadastros (a pessoa monta uma vez e usa no dia a dia)
+    'Cad Treinos':     ['id', 'nome', 'tipo', 'exercicios', 'obs', 'registrado_em'],
+    'Cad Exercicios':  ['id', 'nome', 'grupo', 'obs', 'registrado_em'],
+    'Cad Alimentos':   ['id', 'nome', 'porcao', 'kcal', 'proteina_g', 'carbo_g', 'gordura_g', 'registrado_em'],
+    'Cad Suplementos': ['id', 'nome', 'dose', 'horario', 'obs', 'registrado_em'],
   };
   // nome da lista no aparelho para cada aba
-  const CHAVES = { Agua: 'agua', Metas: 'metas', Perfil: 'perfil', Treinos: 'treinos' };
-  const NUMEROS = { Agua: ['quantidade_ml'], Metas: ['valor'], Perfil: ['idade', 'peso_kg', 'altura_cm'], Treinos: ['minutos'] };
+  const CHAVES = {
+    Agua: 'agua', Metas: 'metas', Perfil: 'perfil', Treinos: 'treinos',
+    'Cad Treinos': 'cadTreinos', 'Cad Exercicios': 'cadExercicios', 'Cad Alimentos': 'cadAlimentos', 'Cad Suplementos': 'cadSuplementos',
+  };
+  const NUMEROS = {
+    Agua: ['quantidade_ml'], Metas: ['valor'], Perfil: ['idade', 'peso_kg', 'altura_cm'], Treinos: ['minutos'],
+    'Cad Alimentos': ['kcal', 'proteina_g', 'carbo_g', 'gordura_g'],
+  };
+  const ESCOPO_GMAIL = 'https://www.googleapis.com/auth/gmail.send';
   // Abas de leitura (fórmulas) para o painel. O app cria uma vez e não mexe mais.
   const ABAS_RESUMO = {
     'Resumo Agua': [['=QUERY(Agua!B:C, "select B, sum(C), count(C) where B is not null group by B order by B desc label B \'dia\', sum(C) \'total_ml\', count(C) \'vezes\'", 1)']],
@@ -94,14 +107,15 @@
   let conta = guardar.ler(CHAVE_CONTA, null);     // { email }
   const tokenValido = () => token && token.expira > Date.now() + 60000;
 
-  function irParaGoogle(silencioso) {
+  const temEscopo = (e) => !!(token && token.escopos && token.escopos.indexOf(e) >= 0);
+  function irParaGoogle(silencioso, extra) {
     const st = novoId();
     try { sessionStorage.setItem('shape-state', st); } catch (e) { /* */ }
     const p = new URLSearchParams({
       client_id: cfg.googleClientId,
       redirect_uri: base(),
       response_type: 'token',
-      scope: ESCOPOS,
+      scope: ESCOPOS + (extra ? ' ' + extra : ''),
       include_granted_scopes: 'true',
       state: st,
     });
@@ -122,7 +136,7 @@
     if (h.get('state') !== esperado) return { erro: 'state' };
     if (h.has('error')) return { erro: h.get('error') };
     if (!String(h.get('scope') || '').includes('drive.file')) return { erro: 'sem_drive' };
-    token = { valor: h.get('access_token'), expira: Date.now() + Number(h.get('expires_in') || 3600) * 1000 };
+    token = { valor: h.get('access_token'), expira: Date.now() + Number(h.get('expires_in') || 3600) * 1000, escopos: h.get('scope') || '' };
     guardar.gravar(CHAVE_TOKEN, token);
     return { ok: true };
   }
@@ -130,7 +144,7 @@
   function sair() {
     if (token) fetch('https://oauth2.googleapis.com/revoke?token=' + encodeURIComponent(token.valor), { method: 'POST' }).catch(() => {});
     token = null; conta = null;
-    [CHAVE_TOKEN, CHAVE_CONTA, CHAVE_DADOS, 'shape-planilha', 'shape-renovou', 'shape-sinc'].forEach(guardar.apagar);
+    [CHAVE_TOKEN, CHAVE_CONTA, CHAVE_DADOS, 'shape-planilha', 'shape-renovou', 'shape-sinc', 'shape-depois'].forEach(guardar.apagar);
     estado = estadoVazio();
     mostrar('login');
   }
@@ -194,7 +208,19 @@
         valueInputOption: 'RAW', data: faltando.map((t) => ({ range: "'" + t + "'!A1", values: [TABELAS[t]] })),
       } });
     }
-    planilha = { id, abas };
+    // colunas novas em abas antigas: atualiza a linha de títulos (uma vez por versão do app)
+    const versao = Object.keys(TABELAS).map((t) => t + ':' + TABELAS[t].length).join(',');
+    if (!planilha || planilha.id !== id || planilha.cab !== versao) {
+      const nomes = Object.keys(TABELAS).filter((t) => faltando.indexOf(t) < 0);
+      const r1 = await google(SHEETS + '/' + id + '/values:batchGet?' + nomes.map((t) => 'ranges=' + faixa(t, '!1:1')).join('&'));
+      const corrigir = nomes.filter((t, i) => ((r1.valueRanges[i].values || [[]])[0] || []).join('|') !== TABELAS[t].join('|'));
+      if (corrigir.length) {
+        await google(SHEETS + '/' + id + '/values:batchUpdate', { method: 'POST', body: {
+          valueInputOption: 'RAW', data: corrigir.map((t) => ({ range: "'" + t + "'!A1", values: [TABELAS[t]] })),
+        } });
+      }
+    }
+    planilha = { id, abas, cab: versao };
     guardar.gravar('shape-planilha', planilha);
   }
 
@@ -206,7 +232,7 @@
     ['dia', 'valida_desde'].forEach((c) => {
       if (typeof o[c] === 'number') o[c] = iso(new Date(Date.UTC(1899, 11, 30) + o[c] * 86400000 + 43200000));
     });
-    (NUMEROS[tabela] || []).forEach((c) => { o[c] = Number(String(o[c]).replace(',', '.')) || 0; });
+    (NUMEROS[tabela] || []).forEach((c) => { if (o[c] !== '') o[c] = Number(String(o[c]).replace(',', '.')) || 0; });
     return o;
   }
 
@@ -295,12 +321,7 @@
     st.innerHTML = '';
     const s = el('span', pend || ultimoErro ? 'pend' : '', txt);
     st.appendChild(s);
-    const link = $('link-planilha');
-    if (planilha && planilha.id) {
-      const a = el('a', '', 'Abrir planilha'); a.href = 'https://docs.google.com/spreadsheets/d/' + planilha.id; a.target = '_blank'; a.rel = 'noopener';
-      st.appendChild(a);
-      link.href = a.href; link.classList.remove('escondido');
-    } else if (ultimoErro) {
+    if (ultimoErro) {
       const b = el('button', 'link', 'Sincronizar');
       b.onclick = () => { guardar.apagar('shape-renovou'); irParaGoogle(false); }; st.appendChild(b);
     }
@@ -317,27 +338,55 @@
     sair();
   };
 
+  // nome: [título, ícone, tela pai (para o botão voltar), bloco da página]
   const SECOES = {
-    painel: '📊 Painel', perfil: '👤 Perfil', treinos: '🏋️ Treinos',
-    dieta: '🥗 Dieta', hidratacao: '💧 Hidratação', suplementacao: '💊 Suplementação',
+    home: ['ShapeUp', 'logo'],
+    perfil: ['Perfil', 'perfil'],
+    painel: ['Painel', 'painel'],
+    hidratacao: ['Hidratação', 'agua', 'home'],
+    treino: ['Treino', 'treino', 'home'],
+    dieta: ['Dieta', 'dieta', 'home'],
+    suplementacao: ['Suplementação', 'suplemento', 'home'],
+    'cad-treino': ['Cadastro de treinos', 'treino', 'home', 'cadastro'],
+    'cad-exercicio': ['Cadastro de exercícios', 'exercicio', 'home', 'cadastro'],
+    'cad-alimento': ['Cadastro de alimentos', 'dieta', 'home', 'cadastro'],
+    'cad-suplemento': ['Cadastro de suplementos', 'suplemento', 'home', 'cadastro'],
   };
-  let secao = guardar.ler('shape-secao', 'painel');
-  if (!SECOES[secao]) secao = 'painel';
+  // aba do menu que fica acesa em cada tela
+  const MENU_DE = (n) => (SECOES[n][2] || n);
+  let secao = guardar.ler('shape-secao', 'home');
+  if (secao === 'treinos') secao = 'treino';
+  if (!SECOES[secao]) secao = 'home';
 
   function irPara(nome) {
-    secao = SECOES[nome] ? nome : 'painel';
+    if (nome !== secao && secao.indexOf('cad-') === 0) limparFormCad();
+    secao = SECOES[nome] ? nome : 'home';
     guardar.gravar('shape-secao', secao);
-    document.querySelectorAll('[data-secao]').forEach((s) => s.classList.toggle('escondido', s.dataset.secao !== secao));
-    document.querySelectorAll('[data-ir]').forEach((b) => {
-      const ativo = b.dataset.ir === secao && b.closest('nav');
-      b.classList.toggle('ativo', !!ativo);
-      if (b.closest('nav')) b.setAttribute('aria-current', ativo ? 'page' : 'false');
+    const [titulo, icone, pai, bloco] = SECOES[secao];
+    document.querySelectorAll('[data-secao]').forEach((s) => s.classList.toggle('escondido', s.dataset.secao !== (bloco || secao)));
+    document.querySelectorAll('nav [data-ir]').forEach((b) => {
+      const ativo = b.dataset.ir === MENU_DE(secao);
+      b.classList.toggle('ativo', ativo);
+      b.setAttribute('aria-current', ativo ? 'page' : 'false');
     });
-    $('titulo-secao').textContent = SECOES[secao];
+    $('titulo-secao').textContent = titulo;
+    $('ic-secao').innerHTML = '<svg' + (icone === 'logo' ? ' class="logo"' : '') + '><use href="#i-' + icone + '"/></svg>';
+    $('voltar').classList.toggle('escondido', !pai);
+    document.title = secao === 'home' ? 'ShapeUp' : titulo + ' · ShapeUp';
     window.scrollTo(0, 0);
     desenhar();
   }
   document.querySelectorAll('[data-ir]').forEach((b) => { b.onclick = () => irPara(b.dataset.ir); });
+  $('voltar').onclick = () => irPara(SECOES[secao][2] || 'home');
+
+  // botões (i): mostram/escondem a explicação
+  document.querySelectorAll('[data-info]').forEach((b) => {
+    b.setAttribute('aria-expanded', 'false');
+    b.onclick = () => {
+      const t = $(b.dataset.info); const abrir = t.classList.contains('escondido');
+      t.classList.toggle('escondido', !abrir); b.setAttribute('aria-expanded', String(abrir));
+    };
+  });
 
   // ---------- Perfil ----------
   // Cada vez que a pessoa salva o perfil, uma linha nova vai para a aba Perfil (fica o histórico do peso).
@@ -362,9 +411,12 @@
     $('perfil-info').textContent = p
       ? 'Última atualização: ' + new Date(p.registrado_em).toLocaleDateString('pt-BR')
       : 'Preencha para o app calcular suas metas de água.';
+    $('btn-salvar-perfil').classList.toggle('escondido', !!p);
     $('conta-email').textContent = modoDemo ? 'Modo demonstração (sem conta)' : (conta && conta.email) || 'Conta Google';
   }
 
+  // o botão de salvar só aparece quando algo foi mudado
+  ['input', 'change'].forEach((ev) => $('form-perfil').addEventListener(ev, () => $('btn-salvar-perfil').classList.remove('escondido')));
   $('form-perfil').addEventListener('submit', (e) => {
     e.preventDefault();
     const n = (id) => Number(String($(id).value).replace(',', '.'));
@@ -386,12 +438,11 @@
   // ---------- Treinos ----------
   const TIPOS_TREINO = { musculacao: 'Musculação', cardio: 'Cárdio' };
 
-  // Adicional de água (ml) pelo treino do dia anterior, segundo a tabela do Fernando.
+  // Adicional de água (ml) pelos treinos registrados NO MESMO DIA, segundo a tabela do Fernando.
   // Cárdio (com ou sem musculação) usa a tabela do cárdio com o total de minutos do dia;
   // só musculação usa a tabela da musculação.
   function adicionalPorTreino(dia) {
-    const ontem = somaDias(dia, -1);
-    const ts = estado.treinos.filter((t) => t.dia === ontem && t.minutos > 0);
+    const ts = estado.treinos.filter((t) => t.dia === dia && t.minutos > 0);
     if (!ts.length) return { ml: 0, treinos: [] };
     const min = ts.reduce((s, t) => s + t.minutos, 0);
     const temCardio = ts.some((t) => t.tipo === 'cardio');
@@ -402,19 +453,25 @@
   }
 
   let tipoTreino = 'musculacao';
-  document.querySelectorAll('[data-tipo]').forEach((b) => {
-    b.onclick = () => {
-      tipoTreino = b.dataset.tipo;
-      document.querySelectorAll('[data-tipo]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-    };
+  function escolherTipo(tipo) {
+    tipoTreino = tipo;
+    document.querySelectorAll('[data-tipo]').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.tipo === tipo)));
+  }
+  document.querySelectorAll('[data-tipo]').forEach((b) => { b.onclick = () => escolherTipo(b.dataset.tipo); });
+  // escolher um treino cadastrado já acerta o tipo
+  $('t-treino').addEventListener('change', () => {
+    const c = estado.cadTreinos.find((x) => x.id === $('t-treino').value);
+    if (c) escolherTipo(c.tipo === 'Cárdio' ? 'cardio' : 'musculacao');
   });
+  const nomeTreinoCad = (id) => { const c = id && estado.cadTreinos.find((x) => x.id === id); return c ? c.nome : ''; };
+
   $('form-treino').addEventListener('submit', (e) => {
     e.preventDefault();
     const dia = $('t-dia').value || hoje();
     const min = Math.round(Number($('t-minutos').value));
     if (!(min >= 1 && min <= 600)) { avisar('Informe os minutos de treino (1 a 600)'); $('t-minutos').focus(); return; }
     if (dia > hoje()) { avisar('A data não pode ser no futuro'); return; }
-    registrar('Treinos', { id: novoId(), dia, tipo: tipoTreino, minutos: min, registrado_em: new Date().toISOString() });
+    registrar('Treinos', { id: novoId(), dia, tipo: tipoTreino, minutos: min, registrado_em: new Date().toISOString(), treino_id: $('t-treino').value });
     $('t-minutos').value = '';
     desenhar(); atualizarStatus(); avisar(TIPOS_TREINO[tipoTreino] + ': ' + min + ' min'); sincronizar();
   });
@@ -422,14 +479,24 @@
   function desenharTreinos() {
     if (!$('t-dia').value) $('t-dia').value = hoje();
     $('t-dia').max = hoje();
+    // lista de treinos cadastrados
+    const sel = $('t-treino'); const atual = sel.value;
+    const cads = estado.cadTreinos.slice().sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    $('rot-treino-cad').classList.toggle('escondido', !cads.length);
+    sel.innerHTML = '';
+    sel.appendChild(el('option', '', '—')).value = '';
+    cads.forEach((c) => { const o = el('option', '', c.nome); o.value = c.id; sel.appendChild(o); });
+    sel.value = cads.some((c) => c.id === atual) ? atual : '';
+
     const lista = $('lista-treinos'); lista.innerHTML = '';
     const ts = estado.treinos.slice().sort((a, b) => (a.dia + a.registrado_em < b.dia + b.registrado_em ? 1 : -1)).slice(0, 15);
     if (!ts.length) lista.appendChild(el('li', 'vazio', 'Nenhum treino registrado ainda.'));
     ts.forEach((t) => {
       const li = el('li');
-      const d = el('div');
-      d.appendChild(el('span', 'hora', t.dia === hoje() ? 'hoje' : t.dia === somaDias(hoje(), -1) ? 'ontem' : semanaDe(t.dia) + ' ' + diaCurto(t.dia)));
-      d.appendChild(el('span', 'ml', (TIPOS_TREINO[t.tipo] || t.tipo) + ' · ' + t.minutos + ' min'));
+      const d = el('div', 'item-txt');
+      const nome = nomeTreinoCad(t.treino_id);
+      d.appendChild(el('span', 'ml', (nome || TIPOS_TREINO[t.tipo] || t.tipo) + ' · ' + t.minutos + ' min'));
+      d.appendChild(el('small', '', (t.dia === hoje() ? 'hoje' : t.dia === somaDias(hoje(), -1) ? 'ontem' : semanaDe(t.dia) + ' ' + diaCurto(t.dia)) + (nome ? ' · ' + (TIPOS_TREINO[t.tipo] || t.tipo) : '')));
       li.appendChild(d);
       const b = el('button', '', '✕'); b.setAttribute('aria-label', 'Apagar treino');
       b.onclick = () => {
@@ -437,6 +504,157 @@
         remover('Treinos', t.id); desenhar(); atualizarStatus(); avisar('Treino apagado'); sincronizar();
       };
       li.appendChild(b);
+      lista.appendChild(li);
+    });
+  }
+
+  // ---------- Cadastros ----------
+  const GRUPOS = ['Peito', 'Costas', 'Ombros', 'Bíceps', 'Tríceps', 'Antebraço', 'Quadríceps', 'Posterior', 'Glúteos', 'Panturrilha', 'Abdômen', 'Corpo inteiro', 'Cárdio'];
+  const HORARIOS = ['Ao acordar', 'Café da manhã', 'Almoço', 'Pré-treino', 'Pós-treino', 'Tarde', 'Jantar', 'Antes de dormir'];
+  const CADASTROS = {
+    'cad-treino': { tabela: 'Cad Treinos', novo: 'Novo treino', lista: 'Treinos cadastrados', vazio: 'Nenhum treino cadastrado ainda.',
+      campos: [
+        { c: 'nome', rot: 'Nome do treino', ph: 'ex.: Treino A – Peito e tríceps', obrig: true },
+        { c: 'tipo', rot: 'Tipo', ops: ['Musculação', 'Cárdio'] },
+        { c: 'exercicios', rot: 'Exercícios', multi: 'cadExercicios' },
+        { c: 'obs', rot: 'Observação', ph: 'opcional' },
+      ],
+      resumo: (i) => [i.tipo, i.exercicios ? i.exercicios.split(' | ').length + ' exercício(s)' : ''].filter(Boolean).join(' · ') },
+    'cad-exercicio': { tabela: 'Cad Exercicios', novo: 'Novo exercício', lista: 'Exercícios cadastrados', vazio: 'Nenhum exercício cadastrado ainda.',
+      campos: [
+        { c: 'nome', rot: 'Nome do exercício', ph: 'ex.: Supino reto', obrig: true },
+        { c: 'grupo', rot: 'Grupo muscular', ops: GRUPOS },
+        { c: 'obs', rot: 'Observação', ph: 'ex.: 4 × 10, descanso 60 s' },
+      ],
+      resumo: (i) => [i.grupo, i.obs].filter(Boolean).join(' · ') },
+    'cad-alimento': { tabela: 'Cad Alimentos', novo: 'Novo alimento', lista: 'Alimentos cadastrados', vazio: 'Nenhum alimento cadastrado ainda.',
+      campos: [
+        { c: 'nome', rot: 'Alimento', ph: 'ex.: Arroz integral', obrig: true },
+        { c: 'porcao', rot: 'Porção', ph: 'ex.: 100 g' },
+        { c: 'kcal', rot: 'Calorias (kcal)', num: true },
+        { c: 'proteina_g', rot: 'Proteína (g)', num: true },
+        { c: 'carbo_g', rot: 'Carboidrato (g)', num: true },
+        { c: 'gordura_g', rot: 'Gordura (g)', num: true },
+      ],
+      resumo: (i) => [i.porcao, i.kcal !== '' ? i.kcal + ' kcal' : '', i.proteina_g !== '' ? i.proteina_g + ' g prot.' : ''].filter(Boolean).join(' · ') },
+    'cad-suplemento': { tabela: 'Cad Suplementos', novo: 'Novo suplemento', lista: 'Suplementos cadastrados', vazio: 'Nenhum suplemento cadastrado ainda.',
+      campos: [
+        { c: 'nome', rot: 'Suplemento', ph: 'ex.: Creatina', obrig: true },
+        { c: 'dose', rot: 'Dose', ph: 'ex.: 5 g' },
+        { c: 'horario', rot: 'Quando tomar', ops: HORARIOS },
+        { c: 'obs', rot: 'Observação', ph: 'opcional' },
+      ],
+      resumo: (i) => [i.dose, i.horario].filter(Boolean).join(' · ') },
+  };
+  let editandoCad = null; // item sendo editado
+
+  function limparFormCad() { editandoCad = null; $('form-cad').dataset.de = ''; }
+
+  function montarFormCad(def) {
+    const f = $('form-cad');
+    if (f.dataset.de === secao) { atualizarEscolhas(def); return; }
+    f.dataset.de = secao; f.innerHTML = '';
+    let par = null;
+    def.campos.forEach((cp) => {
+      const lab = el('label', '', cp.rot);
+      let campo;
+      if (cp.ops) {
+        campo = el('select'); campo.appendChild(el('option', '', '—')).value = '';
+        cp.ops.forEach((o) => campo.appendChild(el('option', '', o)));
+      } else if (cp.multi) {
+        campo = el('div', 'escolhas'); campo.dataset.multi = cp.multi;
+      } else {
+        campo = el('input'); campo.placeholder = cp.ph || '';
+        if (cp.num) { campo.type = 'number'; campo.inputMode = 'decimal'; campo.step = 'any'; campo.min = '0'; }
+      }
+      campo.id = 'cad-' + cp.c;
+      lab.appendChild(campo);
+      // campos numéricos lado a lado, dois por linha
+      if (cp.num) {
+        if (!par) { par = el('div', 'duas'); f.appendChild(par); }
+        par.appendChild(lab); if (par.children.length === 2) par = null;
+      } else { par = null; f.appendChild(lab); }
+    });
+    const bs = el('div', 'form-botoes');
+    const salvar = el('button', 'primario', 'Salvar'); salvar.type = 'submit'; salvar.id = 'cad-salvar';
+    const cancelar = el('button', 'cinza escondido', 'Cancelar'); cancelar.type = 'button'; cancelar.id = 'cad-cancelar';
+    cancelar.onclick = () => { editandoCad = null; preencherFormCad(def, null); };
+    bs.appendChild(salvar); bs.appendChild(cancelar); f.appendChild(bs);
+    preencherFormCad(def, null);
+  }
+
+  function atualizarEscolhas(def, marcados) {
+    def.campos.filter((cp) => cp.multi).forEach((cp) => {
+      const box = $('cad-' + cp.c);
+      const sel = marcados || Array.from(box.querySelectorAll('[aria-pressed="true"]')).map((b) => b.textContent);
+      box.innerHTML = '';
+      const opcoes = estado[cp.multi].map((x) => x.nome).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+      sel.forEach((n) => { if (opcoes.indexOf(n) < 0) opcoes.push(n); }); // mantém nomes antigos
+      if (!opcoes.length) {
+        const p = el('div', 'muted pequeno', 'Cadastre exercícios primeiro em ');
+        const l = el('button', 'link', 'Cadastro › Exercício'); l.type = 'button'; l.onclick = () => irPara('cad-exercicio');
+        p.appendChild(l); box.appendChild(p); return;
+      }
+      opcoes.forEach((n) => {
+        const b = el('button', '', n); b.type = 'button'; b.setAttribute('aria-pressed', String(sel.indexOf(n) >= 0));
+        b.onclick = () => b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true'));
+        box.appendChild(b);
+      });
+    });
+  }
+
+  function preencherFormCad(def, item) {
+    def.campos.forEach((cp) => { if (!cp.multi) $('cad-' + cp.c).value = item && item[cp.c] !== undefined ? String(item[cp.c]) : ''; });
+    atualizarEscolhas(def, item ? def.campos.filter((cp) => cp.multi).reduce((a, cp) => a.concat(item[cp.c] ? String(item[cp.c]).split(' | ') : []), []) : []);
+    $('cad-rotulo-form').textContent = item ? 'Editar' : def.novo;
+    $('cad-salvar').textContent = item ? 'Salvar alterações' : 'Salvar';
+    $('cad-cancelar').classList.toggle('escondido', !item);
+  }
+
+  $('form-cad').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const def = CADASTROS[secao]; if (!def) return;
+    const item = { id: editandoCad ? editandoCad.id : novoId() };
+    for (const cp of def.campos) {
+      if (cp.multi) {
+        item[cp.c] = Array.from($('cad-' + cp.c).querySelectorAll('[aria-pressed="true"]')).map((b) => b.textContent).join(' | ');
+        continue;
+      }
+      let v = String($('cad-' + cp.c).value).trim();
+      if (cp.obrig && !v) { avisar('Preencha: ' + cp.rot); $('cad-' + cp.c).focus(); return; }
+      if (cp.num && v !== '') { v = Number(v.replace(',', '.')); if (!(v >= 0)) { avisar(cp.rot + ': número inválido'); return; } }
+      item[cp.c] = v;
+    }
+    item.registrado_em = new Date().toISOString();
+    if (editandoCad) remover(def.tabela, editandoCad.id);
+    registrar(def.tabela, item);
+    avisar(editandoCad ? 'Alterado' : 'Cadastrado: ' + item.nome);
+    editandoCad = null; preencherFormCad(def, null);
+    desenhar(); atualizarStatus(); sincronizar();
+  });
+
+  function desenharCadastro() {
+    const def = CADASTROS[secao];
+    montarFormCad(def);
+    $('cad-rotulo-lista').textContent = def.lista;
+    const lista = $('lista-cad'); lista.innerHTML = '';
+    const itens = listaDe(def.tabela).slice().sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
+    if (!itens.length) lista.appendChild(el('li', 'vazio', def.vazio));
+    itens.forEach((i) => {
+      const li = el('li');
+      const t = el('div', 'item-txt'); t.appendChild(el('span', 'ml', i.nome));
+      const r = def.resumo(i); if (r) t.appendChild(el('small', '', r));
+      li.appendChild(t);
+      const ac = el('div', 'acoes');
+      const ed = el('button', 'editar', 'Editar');
+      ed.onclick = () => { editandoCad = i; preencherFormCad(def, i); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+      const ap = el('button', '', '✕'); ap.setAttribute('aria-label', 'Apagar ' + i.nome);
+      ap.onclick = () => {
+        if (!confirm('Apagar "' + i.nome + '"?')) return;
+        if (editandoCad && editandoCad.id === i.id) { editandoCad = null; preencherFormCad(def, null); }
+        remover(def.tabela, i.id); desenhar(); atualizarStatus(); avisar('Apagado'); sincronizar();
+      };
+      ac.appendChild(ed); ac.appendChild(ap); li.appendChild(ac);
       lista.appendChild(li);
     });
   }
@@ -449,13 +667,22 @@
     return ms.length ? Number(ms[ms.length - 1].valor) : META_PADRAO_ML;
   }
 
-  // Meta mínima = peso × 30; meta recomendada = peso × 35 + adicional do treino de ontem.
+  // Meta recomendada trocada pela pessoa só para um dia (aba Metas, tipo "recomendada_dia").
+  const alteracoesDoDia = (dia) => estado.metas.filter((m) => m.modulo === 'agua' && m.tipo === 'recomendada_dia' && String(m.valida_desde) === dia)
+    .sort((a, b) => (a.registrado_em < b.registrado_em ? -1 : 1));
+
+  // Meta mínima = peso × 30; meta recomendada = peso × 35 + adicional dos treinos do mesmo dia
+  // (ou o valor que a pessoa escolheu para aquele dia).
   function metasDoDia(dia) {
     const p = perfilNoDia(dia);
     const a = adicionalPorTreino(dia);
-    if (p) return { minima: Math.round(p.peso_kg * 30), recomendada: Math.round(p.peso_kg * 35) + a.ml, adicional: a, peso: p.peso_kg };
-    const m = metaManualNoDia(dia);
-    return { minima: m, recomendada: m + a.ml, adicional: a, peso: null };
+    const m = p
+      ? { minima: Math.round(p.peso_kg * 30), recomendada: Math.round(p.peso_kg * 35) + a.ml, adicional: a, peso: p.peso_kg }
+      : { minima: metaManualNoDia(dia), recomendada: metaManualNoDia(dia) + a.ml, adicional: a, peso: null };
+    m.calculada = m.recomendada;
+    const alt = alteracoesDoDia(dia);
+    if (alt.length) { m.recomendada = Number(alt[alt.length - 1].valor); m.alterada = true; }
+    return m;
   }
   const totalDoDia = (dia) => estado.agua.filter((r) => r.dia === dia).reduce((t, r) => t + r.quantidade_ml, 0);
   const SITUACOES = {
@@ -477,57 +704,96 @@
   }
 
   function descreverAdicional(a) {
-    if (!a.treinos.length) return 'Sem treino registrado ontem: adicional de 0 ml.';
+    if (!a.treinos.length) return '';
     const tipo = a.cardio ? (a.treinos.some((t) => t.tipo === 'musculacao') ? 'cárdio + musculação' : 'cárdio') : 'musculação';
-    return 'Treino de ontem: ' + tipo + ', ' + a.minutos + ' min → adicional de ' + fmt(a.ml) + '.';
+    return 'Treino de hoje: ' + tipo + ', ' + a.minutos + ' min.';
   }
+  const pctTxt = (v) => Math.abs(v).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
 
   function desenharHidratacao() {
     const dia = hoje();
     const m = metasDoDia(dia);
     $('h-minima').textContent = fmt(m.minima);
     $('h-recomendada').textContent = fmt(m.recomendada);
-    $('h-conta-min').textContent = m.peso ? m.peso.toLocaleString('pt-BR') + ' kg × 30' : 'meta antiga (sem peso no perfil)';
-    $('h-conta-rec').textContent = m.peso ? m.peso.toLocaleString('pt-BR') + ' kg × 35 + ' + fmt(m.adicional.ml) : 'meta antiga + ' + fmt(m.adicional.ml);
+    const kg = m.peso ? m.peso.toLocaleString('pt-BR') + ' kg' : '';
+    $('h-conta-min').textContent = m.peso ? kg + ' × 30' : 'meta antiga (sem peso no perfil)';
+    $('h-conta-rec').innerHTML = '';
+    if (m.alterada) {
+      $('h-conta-rec').textContent = 'alterada por você (calculada: ' + fmt(m.calculada) + ')';
+    } else {
+      [m.peso ? kg + ' × 35' : 'meta antiga', '+', 'Adicional treino = ' + fmt(m.adicional.ml)].forEach((t) => $('h-conta-rec').appendChild(el('div', '', t)));
+    }
     $('h-adicional').textContent = descreverAdicional(m.adicional);
     $('h-sem-perfil').classList.toggle('escondido', !!m.peso);
-
-    // Inserções do dia
-    const doDia = estado.agua.filter((r) => r.dia === dia).sort((a, b) => (a.registrado_em < b.registrado_em ? 1 : -1));
-    const tb = $('tab-insercoes'); tb.innerHTML = '';
-    if (!doDia.length) {
-      const tr = el('tr'); const td = el('td', 'vazio', 'Nenhum registro hoje ainda.'); td.colSpan = 3; tr.appendChild(td); tb.appendChild(tr);
+    const ma = $('h-meta-alterada'); ma.innerHTML = ''; ma.className = 'nota-meta';
+    if (m.alterada) {
+      ma.classList.add('alterada');
+      ma.appendChild(document.createTextNode('Meta de hoje alterada para ' + fmt(m.recomendada) + '. '));
+      const v = el('button', 'link', 'Voltar à recomendada'); v.onclick = voltarMetaRecomendada; ma.appendChild(v);
+    } else {
+      ma.textContent = 'A alteração vale só para hoje.';
     }
+
+    // Registros do dia (para desfazer um toque errado)
+    const doDia = estado.agua.filter((r) => r.dia === dia).sort((a, b) => (a.registrado_em < b.registrado_em ? 1 : -1));
+    const total = doDia.reduce((t, r) => t + r.quantidade_ml, 0);
+    $('h-parcial').textContent = fmt(total);
+    $('h-qtd-registros').textContent = doDia.length ? '(' + doDia.length + ')' : '';
+    const ul = $('lista-insercoes'); ul.innerHTML = '';
+    if (!doDia.length) ul.appendChild(el('li', 'vazio', 'Nenhum registro hoje ainda.'));
     doDia.forEach((r) => {
-      const tr = el('tr');
-      tr.appendChild(el('td', '', horaDe(r.registrado_em)));
-      tr.appendChild(el('td', 'num forte', fmt(r.quantidade_ml)));
-      const td = el('td', 'acao'); const b = el('button', 'apagar', '✕'); b.setAttribute('aria-label', 'Apagar');
+      const li = el('li'); const d = el('div');
+      d.appendChild(el('span', 'hora', horaDe(r.registrado_em))); d.appendChild(el('span', 'ml', fmt(r.quantidade_ml)));
+      li.appendChild(d);
+      const b = el('button', '', '✕'); b.setAttribute('aria-label', 'Apagar');
       b.onclick = () => {
         if (!confirm('Apagar ' + fmt(r.quantidade_ml) + ' das ' + horaDe(r.registrado_em) + '?')) return;
         remover('Agua', r.id); desenhar(); atualizarStatus(); avisar('Apagado'); sincronizar();
       };
-      td.appendChild(b); tr.appendChild(td); tb.appendChild(tr);
+      li.appendChild(b); ul.appendChild(li);
     });
-    const total = doDia.reduce((t, r) => t + r.quantidade_ml, 0);
-    $('tot-insercoes').textContent = fmt(total);
 
-    // Totais por dia x metas (últimos 14 dias desde que começou a usar)
-    const tt = $('tab-totais'); tt.innerHTML = '';
-    const inicio = primeiroDia();
-    for (let i = 0; i < 14; i++) {
-      const d = somaDias(dia, -i);
-      if (d < inicio) break;
-      const md = metasDoDia(d); const tot = totalDoDia(d);
-      const tr = el('tr');
-      tr.appendChild(el('td', '', i === 0 ? 'hoje' : semanaDe(d) + ' ' + diaCurto(d)));
-      tr.appendChild(el('td', 'num forte', litros(tot)));
-      tr.appendChild(el('td', 'num', litros(md.minima)));
-      tr.appendChild(el('td', 'num', litros(md.recomendada)));
-      const td = el('td'); td.appendChild(chip(situacao(tot, md))); tr.appendChild(td);
-      tt.appendChild(tr);
-    }
+    desenharTabelaMes();
   }
+
+  // Tabela do mês: consumo de cada dia e quanto ficou acima/abaixo das metas
+  function desenharTabelaMes() {
+    const sel = $('mes-tabela');
+    const atual = hoje().slice(0, 7);
+    const meses = [];
+    for (let mm = primeiroDia().slice(0, 7); mm <= atual; mm = somaDias(mm + '-28', 7).slice(0, 7)) meses.push(mm);
+    if (!meses.length) meses.push(atual);
+    const escolhido = meses.indexOf(sel.value) >= 0 ? sel.value : atual;
+    if (sel.options.length !== meses.length) {
+      sel.innerHTML = '';
+      meses.slice().reverse().forEach((mm) => {
+        const o = el('option', '', new Date(mm + '-15T12:00:00').toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }).replace('.', '').replace(' de ', '/'));
+        o.value = mm; sel.appendChild(o);
+      });
+    }
+    sel.value = escolhido;
+    const tb = $('tab-mes'); tb.innerHTML = '';
+    const inicio = primeiroDia();
+    let d = escolhido + '-01';
+    let linhas = 0;
+    for (; d.slice(0, 7) === escolhido && d <= hoje(); d = somaDias(d, 1)) {
+      if (d < inicio) continue;
+      const md = metasDoDia(d); const tot = totalDoDia(d);
+      const tr = el('tr', d === hoje() ? 'hoje' : '');
+      tr.appendChild(el('td', '', d.slice(8)));
+      tr.appendChild(el('td', 't-' + { excelente: 'exc', bom: 'bom', ruim: 'ruim' }[situacao(tot, md)], fmt(tot)));
+      [md.minima, md.recomendada].forEach((meta) => {
+        const v = meta ? (tot / meta - 1) * 100 : 0;
+        const td = el('td', 'var');
+        td.appendChild(el('span', v >= 0 ? 'sobe' : 'desce', v >= 0 ? '▲ ' : '▼ '));
+        td.appendChild(document.createTextNode(pctTxt(v)));
+        tr.appendChild(td);
+      });
+      tb.appendChild(tr); linhas++;
+    }
+    if (!linhas) { const tr = el('tr'); const td = el('td', 'vazio', 'Sem registros neste mês.'); td.colSpan = 4; tr.appendChild(td); tb.appendChild(tr); }
+  }
+  $('mes-tabela').addEventListener('change', desenharTabelaMes);
 
   function adicionar(valor) {
     const ml = Math.round(Number(valor));
@@ -538,6 +804,31 @@
   document.querySelectorAll('[data-ml]').forEach((b) => { b.onclick = () => adicionar(b.dataset.ml); });
   $('add-outro').onclick = () => { adicionar($('outro').value); $('outro').value = ''; };
   $('outro').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('add-outro').click(); });
+
+  // Alterar a meta recomendada de hoje (dias que já passaram não mudam mais)
+  function alterarMetaHoje() {
+    const ml = Math.round(Number($('nova-meta').value));
+    if (!(ml >= 500 && ml <= 10000)) { avisar('Digite uma meta entre 500 e 10000 ml'); $('nova-meta').focus(); return; }
+    alteracoesDoDia(hoje()).forEach((x) => remover('Metas', x.id));
+    registrar('Metas', { id: novoId(), modulo: 'agua', tipo: 'recomendada_dia', valor: ml, unidade: 'ml', valida_desde: hoje(), registrado_em: new Date().toISOString() });
+    $('nova-meta').value = ''; $('nova-meta').blur();
+    desenhar(); atualizarStatus(); avisar('Meta de hoje: ' + fmt(ml)); sincronizar();
+  }
+  function voltarMetaRecomendada() {
+    alteracoesDoDia(hoje()).forEach((x) => remover('Metas', x.id));
+    desenhar(); atualizarStatus(); avisar('Voltou para a meta recomendada'); sincronizar();
+  }
+  $('btn-nova-meta').onclick = alterarMetaHoje;
+  $('nova-meta').addEventListener('keydown', (e) => { if (e.key === 'Enter') alterarMetaHoje(); });
+
+  // ---------- Tela inicial ----------
+  function desenharHome() {
+    const m = metasDoDia(hoje()); const tot = totalDoDia(hoje());
+    $('b-agua').textContent = Math.round(tot).toLocaleString('pt-BR') + ' / ' + fmt(m.recomendada);
+    $('b-agua-barra').style.width = Math.min(100, m.recomendada ? (tot / m.recomendada) * 100 : 0) + '%';
+    const a = adicionalPorTreino(hoje());
+    $('b-treino').textContent = a.treinos.length ? a.minutos + ' min hoje' : 'nada hoje';
+  }
 
   // ---------- Painel ----------
   const SVGNS = 'http://www.w3.org/2000/svg';
@@ -668,13 +959,77 @@
   let redimTimer;
   window.addEventListener('resize', () => { clearTimeout(redimTimer); redimTimer = setTimeout(() => { if (secao === 'painel') desenharSemana(); }, 150); });
 
+  // ---------- Backup por e-mail ----------
+  // Junta todas as abas num único .csv (separado por ";" para abrir direto no Excel em português)
+  // e envia para o e-mail da própria pessoa pelo Gmail dela. Sem Gmail (modo demo ou erro), baixa o arquivo.
+  function montarCsv() {
+    const cel = (v) => { const t = v === undefined || v === null ? '' : String(v); return /[;"\n\r]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+    const linhas = ['ShapeUp - backup de ' + new Date().toLocaleString('pt-BR')];
+    Object.keys(TABELAS).forEach((t) => {
+      linhas.push('', '[' + t + ']', TABELAS[t].map(cel).join(';'));
+      listaDe(t).forEach((i) => linhas.push(TABELAS[t].map((c) => cel(typeof i[c] === 'number' ? String(i[c]).replace('.', ',') : i[c])).join(';')));
+    });
+    return '\ufeff' + linhas.join('\r\n');
+  }
+  const nomeBackup = () => 'shapeup-backup-' + hoje() + '.csv';
+  const b64 = (txt) => { const b = new TextEncoder().encode(txt); let s = ''; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(s); };
+
+  async function baixarBackup(motivo) {
+    const arq = new File([montarCsv()], nomeBackup(), { type: 'text/csv' });
+    if (navigator.canShare && navigator.canShare({ files: [arq] })) {
+      try { await navigator.share({ files: [arq], title: 'Backup ShapeUp' }); return; } catch (e) { if (e.name === 'AbortError') return; }
+    }
+    const a = el('a'); a.href = URL.createObjectURL(arq); a.download = arq.name; document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    if (motivo) avisar(motivo);
+  }
+
+  async function fazerBackup() {
+    if (modoDemo) { baixarBackup('Modo demonstração: o arquivo foi baixado.'); return; }
+    if (!navigator.onLine) { baixarBackup('Sem internet: o arquivo foi baixado.'); return; }
+    if (!tokenValido() || !temEscopo('gmail.send')) {
+      // pede ao Google a permissão de enviar e-mail (só na primeira vez) e volta para cá
+      try { sessionStorage.setItem('shape-depois', 'backup'); } catch (e) { /* */ }
+      irParaGoogle(false, ESCOPO_GMAIL);
+      return;
+    }
+    const email = conta && conta.email;
+    if (!email) { baixarBackup('Não achei seu e-mail: o arquivo foi baixado.'); return; }
+    const info = $('backup-info'); info.textContent = 'Enviando backup para ' + email + '…';
+    const sep = 'shapeup-' + novoId();
+    const assunto = 'Backup ShapeUp - ' + new Date().toLocaleDateString('pt-BR');
+    const mime = [
+      'To: ' + email, 'Subject: =?UTF-8?B?' + b64(assunto) + '?=', 'MIME-Version: 1.0',
+      'Content-Type: multipart/mixed; boundary="' + sep + '"', '',
+      '--' + sep, 'Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64', '',
+      b64('Olá!\n\nSegue em anexo o backup de todos os seus dados do ShapeUp (treinos, água, perfil, metas e cadastros).\n' +
+        'O arquivo abre no Excel ou no Google Planilhas.\n\nShapeUp'),
+      '--' + sep, 'Content-Type: text/csv; charset=UTF-8; name="' + nomeBackup() + '"',
+      'Content-Disposition: attachment; filename="' + nomeBackup() + '"', 'Content-Transfer-Encoding: base64', '',
+      b64(montarCsv()).replace(/.{76}/g, '$&\r\n'), '--' + sep + '--', '',
+    ].join('\r\n');
+    try {
+      await google('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', { method: 'POST',
+        body: { raw: b64(mime).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') } });
+      info.textContent = 'Último backup enviado para ' + email + ' em ' + new Date().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) + '.';
+      avisar('Backup enviado para o seu e-mail');
+    } catch (e) {
+      console.error(e);
+      info.textContent = 'O Gmail recusou o envio (' + e.message + '). Baixei o arquivo no aparelho.';
+      baixarBackup();
+    }
+  }
+  $('btn-backup').onclick = fazerBackup;
+
   // ---------- Desenho geral ----------
   function desenhar() {
     if ($('tela-app').classList.contains('escondido')) return;
     if (secao === 'painel') desenharPainel();
+    else if (secao === 'home') desenharHome();
     else if (secao === 'hidratacao') desenharHidratacao();
-    else if (secao === 'treinos') desenharTreinos();
+    else if (secao === 'treino') desenharTreinos();
     else if (secao === 'perfil') preencherPerfil();
+    else if (CADASTROS[secao]) desenharCadastro();
   }
 
   document.addEventListener('visibilitychange', () => {
@@ -694,6 +1049,10 @@
     // primeira vez, sem perfil: começa pelo Perfil
     if (!estado.perfil.length && !guardar.ler('shape-secao', null)) secao = 'perfil';
     irPara(secao); atualizarStatus(); sincronizar();
+    // voltou do Google depois de pedir a permissão do backup?
+    let depois = null;
+    try { depois = sessionStorage.getItem('shape-depois'); sessionStorage.removeItem('shape-depois'); } catch (e) { /* */ }
+    if (depois === 'backup') { irPara('perfil'); if (temEscopo('gmail.send')) fazerBackup(); else avisar('Backup cancelado: o envio de e-mail não foi permitido.'); }
   }
 
   // ---------- Início ----------
@@ -706,6 +1065,7 @@
         ultimoErro = 'Toque em "Sincronizar" para entrar de novo no Google.';
         abrirApp(); return;
       }
+      if (jaEntrou && ret.erro === 'access_denied') { abrirApp(); return; } // ex.: recusou a permissão do backup
       mostrar('login');
       $('msg-login').className = 'msg erro';
       $('msg-login').textContent = ret.erro === 'access_denied' ? 'Você cancelou a entrada com o Google.'
