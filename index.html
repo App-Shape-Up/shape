@@ -3,11 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0e7ad1">
+<meta name="theme-color" content="#0a120d">
+<meta name="color-scheme" content="dark">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Shape">
-<title>Shape</title>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ShapeUp">
+<title>ShapeUp</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
@@ -15,54 +16,94 @@
 </head>
 <body>
 
-<!-- Tela de entrar / criar conta -->
+<!-- Ícones (desenhados em linha, usados com <use href="#i-...">) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="g-marca" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#22b357"/><stop offset="1" stop-color="#b8f25c"/></linearGradient>
+  </defs>
+  <symbol id="i-logo" viewBox="0 0 64 64"><g fill="none" stroke="url(#g-marca)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" transform="translate(32 32) scale(.88) translate(-33.5 -31)"><path d="M50 8.5C45.5 12 39 13 32 13c-7 0-12 3.9-12 9.6 0 5.4 4.2 7.6 11.3 9.2 7.4 1.7 12.7 3.9 12.7 10.3 0 6.1-5.5 10.4-13 10.4-5.6 0-9.9-2-12.8-5.6"/><path d="M42.5 7.6L50.5 8.1L49.2 16"/></g></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3.5 10.8 12 3.8l8.5 7V20a1 1 0 0 1-1 1H15v-6.2H9V21H4.5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></symbol>
+  <symbol id="i-perfil" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M4.5 20.5c.6-3.9 3.7-6.3 7.5-6.3s6.9 2.4 7.5 6.3" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+  <symbol id="i-painel" viewBox="0 0 24 24"><path d="M4 20.5h16.5M6.5 17v-4M10.5 17V9.5M14.5 17v-6M18.5 17V5.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+  <symbol id="i-treino" viewBox="0 0 24 24"><path d="M6.5 7v10M17.5 7v10M3.5 9.5v5M20.5 9.5v5M6.5 12h11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+  <symbol id="i-agua" viewBox="0 0 24 24"><path d="M12 3.2s6.2 6.6 6.2 11.2a6.2 6.2 0 0 1-12.4 0C5.8 9.8 12 3.2 12 3.2z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M9.2 14.6a2.9 2.9 0 0 0 2.6 2.9" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+  <symbol id="i-dieta" viewBox="0 0 24 24"><path d="M12 7.6c-1.7-1.2-4.8-1.3-6.3 1.2-1.6 2.7-.6 7.3 1.6 10 1.3 1.6 2.6 2 4.7 1.1 2.1.9 3.4.5 4.7-1.1 2.2-2.7 3.2-7.3 1.6-10-1.5-2.5-4.6-2.4-6.3-1.2z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M12 7.6c0-2 .9-3.6 2.8-4.3" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+  <symbol id="i-suplemento" viewBox="0 0 24 24"><rect x="6.5" y="3" width="11" height="4" rx="1" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M7 7h10v12.5a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 7 19.5z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M7 11h10v5H7z" fill="currentColor" opacity=".35"/></symbol>
+  <symbol id="i-exercicio" viewBox="0 0 24 24"><circle cx="13.5" cy="4.5" r="2" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M6 10.5l4-2.5 4 1.5 3.5 3M10 8l-1.5 6 4 3V21M8.5 14 6 20.5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-voltar" viewBox="0 0 24 24"><path d="M14.5 5.5 8 12l6.5 6.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 11v5.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="7.9" r="1.1" fill="currentColor"/></symbol>
+  <symbol id="i-mais" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
+  <symbol id="i-trocar" viewBox="0 0 24 24"><path d="M4 12h16M8 8l-4 4 4 4M16 8l4 4-4 4" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-seta" viewBox="0 0 24 24"><path d="M9.5 5.5 16 12l-6.5 6.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
+
+<!-- Tela de entrar -->
 <main id="tela-login" class="escondido">
   <div class="login-topo">
-    <img src="icons/icon.svg" alt="" width="64" height="64">
-    <h1>Shape</h1>
-    <p class="muted">Seu controle de saúde: água, treinos e, em breve, dieta e suplementação.</p>
+    <img src="icons/icon.svg" alt="" width="88" height="88">
+    <h1>ShapeUp</h1>
+    <p class="muted">Treinos, hidratação, dieta e suplementação num só lugar.</p>
   </div>
   <div class="card login-card">
     <button class="google" type="button" id="btn-google">
       <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.5l6.7-6.7C35.6 2.4 30.2 0 24 0 14.6 0 6.6 5.4 2.6 13.3l7.8 6C12.3 13.6 17.6 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 7l7.5 5.8c4.4-4 6.8-10 6.8-17.3z"/><path fill="#FBBC05" d="M10.4 28.7c-.5-1.4-.8-3-.8-4.7s.3-3.2.8-4.7l-7.8-6C1 16.6 0 20.2 0 24s1 7.4 2.6 10.7l7.8-6z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.8 2.3-8.4 2.3-6.4 0-11.7-4.1-13.6-9.8l-7.8 6C6.6 42.6 14.6 48 24 48z"/></svg>
       Entrar com Google
     </button>
-    <p class="muted pequeno">Seus dados ficam numa planilha <b>no seu próprio Google Drive</b>. O app só consegue mexer nos arquivos que ele mesmo criou, e ninguém mais tem acesso.</p>
+    <p class="muted pequeno">Seus dados ficam guardados <b>no seu próprio Google Drive</b>. O app só mexe nos arquivos que ele mesmo criou, e ninguém mais tem acesso.</p>
     <p class="msg" id="msg-login"></p>
   </div>
 </main>
 
 <!-- App -->
 <div id="tela-app" class="escondido carregando">
-  <nav class="menu" aria-label="Seções">
-    <div class="menu-marca"><img src="icons/icon.svg" alt="" width="28" height="28"> Shape</div>
-    <button data-ir="painel"><span class="ic">📊</span><span>Painel</span></button>
-    <button data-ir="perfil"><span class="ic">👤</span><span>Perfil</span></button>
-    <button data-ir="treinos"><span class="ic">🏋️</span><span>Treinos</span></button>
-    <button data-ir="dieta"><span class="ic">🥗</span><span>Dieta</span></button>
-    <button data-ir="hidratacao"><span class="ic">💧</span><span>Hidratação</span></button>
-    <button data-ir="suplementacao"><span class="ic">💊</span><span>Suplem.</span></button>
+  <nav class="menu" aria-label="Menu">
+    <div class="menu-marca"><svg class="logo"><use href="#i-logo"/></svg> ShapeUp</div>
+    <button data-ir="home" aria-label="Início"><svg><use href="#i-home"/></svg><span>Início</span></button>
+    <button data-ir="perfil" aria-label="Perfil"><svg><use href="#i-perfil"/></svg><span>Perfil</span></button>
+    <button data-ir="painel" aria-label="Painel"><svg><use href="#i-painel"/></svg><span>Painel</span></button>
   </nav>
 
   <main>
-  <header>
+  <header class="topo">
+    <button class="voltar escondido" id="voltar" aria-label="Voltar"><svg><use href="#i-voltar"/></svg></button>
+    <span class="ic-secao" id="ic-secao"></span>
     <div>
-      <h1 id="titulo-secao">Shape</h1>
-      <div class="muted pequeno" id="data-hoje"></div>
+      <h1 id="titulo-secao">ShapeUp</h1>
+      <div class="data" id="data-hoje"></div>
     </div>
   </header>
   <div class="status pequeno" id="status"></div>
   <div class="faixa-demo escondido" id="faixa-demo">Modo demonstração: os dados ficam só neste aparelho.</div>
 
+  <!-- ===== Início ===== -->
+  <div data-secao="home" class="escondido">
+    <div class="rotulo">Cadastro <button class="info" data-info="info-cad" aria-label="O que é o cadastro"><svg><use href="#i-info"/></svg></button></div>
+    <p class="info-texto escondido" id="info-cad">Cadastre diferentes treinos, exercícios que irão fazer parte desses treinos, alimentos e suplementos que irão compor sua dieta.</p>
+    <div class="grade-cad">
+      <button class="btn-cad" data-ir="cad-treino">Treino</button>
+      <button class="btn-cad" data-ir="cad-exercicio">Exercício</button>
+      <button class="btn-cad" data-ir="cad-alimento">Dieta</button>
+      <button class="btn-cad" data-ir="cad-suplemento">Suplemento</button>
+    </div>
+
+    <div class="rotulo">Registro diário <button class="info" data-info="info-reg" aria-label="O que é o registro diário"><svg><use href="#i-info"/></svg></button></div>
+    <p class="info-texto escondido" id="info-reg">Registre diariamente seus treinos, consumo de água, dieta e suplementação.</p>
+    <div class="grade-reg">
+      <button class="bloco" data-ir="treino"><svg><use href="#i-treino"/></svg><b>Treino</b><span id="b-treino">—</span></button>
+      <button class="bloco" data-ir="hidratacao"><svg><use href="#i-agua"/></svg><b>Água</b><span id="b-agua">—</span><i class="mini-barra"><i id="b-agua-barra"></i></i></button>
+      <button class="bloco" data-ir="dieta"><svg><use href="#i-dieta"/></svg><b>Dieta</b><span>em breve</span></button>
+      <button class="bloco" data-ir="suplementacao"><svg><use href="#i-suplemento"/></svg><b>Suplemento</b><span>em breve</span></button>
+    </div>
+  </div>
+
   <!-- ===== Painel ===== -->
   <div data-secao="painel" class="escondido">
     <div class="filtro">
-      <label for="analise" class="muted pequeno">O que analisar</label>
-      <select id="analise">
-        <option value="agua">💧 Consumo de água</option>
-        <option disabled>🏋️ Treinos (em breve)</option>
-        <option disabled>🥗 Dieta (em breve)</option>
-        <option disabled>💊 Suplementação (em breve)</option>
+      <select id="analise" aria-label="O que analisar">
+        <option value="agua">Consumo de água</option>
+        <option disabled>Treinos (em breve)</option>
+        <option disabled>Dieta (em breve)</option>
+        <option disabled>Suplementação (em breve)</option>
       </select>
     </div>
 
@@ -124,92 +165,119 @@
         <span><span class="amostra min tracejada"></span>Mínima</span>
       </div>
       <div class="grafico" id="grafico-semana"><div class="dica" id="dica-semana" role="status"></div></div>
-      <div class="muted pequeno legenda">Toque ou passe o mouse no gráfico para ver os valores de cada dia. A tabela dia a dia fica em Hidratação.</div>
+      <div class="muted pequeno legenda">Toque ou passe o mouse no gráfico para ver os valores de cada dia. A tabela do mês fica em Água.</div>
     </section>
   </div>
 
   <!-- ===== Hidratação ===== -->
   <div data-secao="hidratacao" class="escondido">
+    <div class="rotulo">Registro diário</div>
     <section class="card">
-      <h2>Metas de hoje</h2>
-      <div class="metas-hoje">
-        <div><div class="muted pequeno"><span class="amostra min"></span>Mínima</div><div class="grande" id="h-minima">—</div><div class="muted pequeno" id="h-conta-min"></div></div>
-        <div><div class="muted pequeno"><span class="amostra rec"></span>Recomendada</div><div class="grande" id="h-recomendada">—</div><div class="muted pequeno" id="h-conta-rec"></div></div>
+      <div class="cab-card">
+        <span class="muted">Adicionar</span>
+        <span class="parcial">Parcial: <b id="h-parcial">0 ml</b></span>
       </div>
-      <div class="pequeno espaco" id="h-adicional"></div>
-      <div class="pequeno espaco escondido" id="h-sem-perfil">Preencha o peso no <button class="link" data-ir="perfil">Perfil</button> para calcular as metas.</div>
-    </section>
-
-    <section class="card">
-      <h2>Adicionar</h2>
       <div class="botoes">
-        <button data-ml="200">200 ml</button>
-        <button data-ml="300">300 ml</button>
-        <button data-ml="500">500 ml</button>
-        <button data-ml="750">750 ml</button>
+        <button class="cinza" data-ml="20">+20 ml</button>
+        <button class="cinza" data-ml="50">+50 ml</button>
+        <button class="cinza" data-ml="100">+100 ml</button>
+        <button class="cinza" data-ml="200">+200 ml</button>
+        <button class="cinza" data-ml="500">+500 ml</button>
+        <button class="cinza" data-ml="1000">+1000 ml</button>
       </div>
       <div class="linha">
         <input id="outro" type="number" inputmode="numeric" placeholder="Outra quantidade (ml)" min="1" max="5000">
-        <button class="primario" id="add-outro">Adicionar</button>
+        <button class="primario quadrado" id="add-outro" aria-label="Adicionar"><svg><use href="#i-mais"/></svg></button>
       </div>
+      <details class="registros">
+        <summary>Registros de hoje <span id="h-qtd-registros"></span></summary>
+        <ul id="lista-insercoes"></ul>
+      </details>
     </section>
 
     <section class="card">
-      <h2>Inserções de hoje</h2>
-      <table class="tabela">
-        <thead><tr><th>Hora</th><th class="num">Quantidade</th><th></th></tr></thead>
-        <tbody id="tab-insercoes"></tbody>
-        <tfoot><tr><th>Total</th><th class="num" id="tot-insercoes">0 ml</th><th></th></tr></tfoot>
+      <div class="metas-hoje">
+        <div>
+          <div class="rot-meta min">Mínima</div>
+          <div class="grande" id="h-minima">—</div>
+          <div class="conta-meta" id="h-conta-min"></div>
+        </div>
+        <div>
+          <div class="rot-meta rec">Recomendada</div>
+          <div class="grande" id="h-recomendada">—</div>
+          <div class="conta-meta" id="h-conta-rec"></div>
+        </div>
+      </div>
+      <div class="nota-meta" id="h-adicional"></div>
+      <div class="nota-meta escondido" id="h-sem-perfil">Preencha o peso no <button class="link" data-ir="perfil">Perfil</button> para calcular as metas.</div>
+      <div class="sub-rotulo">Alterar meta recomendada</div>
+      <div class="linha sem-margem">
+        <input id="nova-meta" type="number" inputmode="numeric" placeholder="Nova meta (ml)" min="500" max="10000">
+        <button class="primario quadrado" id="btn-nova-meta" aria-label="Trocar a meta de hoje"><svg><use href="#i-trocar"/></svg></button>
+      </div>
+      <div class="nota-meta" id="h-meta-alterada"></div>
+    </section>
+
+    <section class="card">
+      <select id="mes-tabela" class="seletor-mes" aria-label="Mês da tabela"></select>
+      <table class="tabela tabela-mes">
+        <thead><tr><th>Dia</th><th class="num">Consumo</th><th class="num">At. Mín.</th><th class="num">At. Rec.</th></tr></thead>
+        <tbody id="tab-mes"></tbody>
       </table>
-    </section>
-
-    <section class="card">
-      <h2>Totais por dia x metas</h2>
-      <div class="rolar">
-        <table class="tabela">
-          <thead><tr><th>Dia</th><th class="num">Total</th><th class="num">Mínima</th><th class="num">Recom.</th><th>Situação</th></tr></thead>
-          <tbody id="tab-totais"></tbody>
-        </table>
-      </div>
-      <div class="muted pequeno legenda">Últimos 14 dias, a partir do primeiro registro.</div>
+      <div class="muted pequeno legenda">Consumo em <span class="t-exc">verde</span> bateu a recomendada, em <span class="t-bom">amarelo</span> ficou entre as metas e em <span class="t-ruim">vermelho</span> ficou abaixo da mínima. As setas mostram quanto acima (▲) ou abaixo (▼) de cada meta.</div>
     </section>
   </div>
 
-  <!-- ===== Treinos ===== -->
-  <div data-secao="treinos" class="escondido">
+  <!-- ===== Treino (registro do dia) ===== -->
+  <div data-secao="treino" class="escondido">
+    <div class="rotulo">Registro diário</div>
     <section class="card">
-      <h2>Registrar treino</h2>
       <form id="form-treino" class="formulario">
         <div class="segmentado" role="group" aria-label="Tipo de treino">
-          <button type="button" data-tipo="musculacao" aria-pressed="true">🏋️ Musculação</button>
-          <button type="button" data-tipo="cardio" aria-pressed="false">🏃 Cárdio</button>
+          <button type="button" data-tipo="musculacao" aria-pressed="true">Musculação</button>
+          <button type="button" data-tipo="cardio" aria-pressed="false">Cárdio</button>
         </div>
+        <label id="rot-treino-cad" class="escondido">Treino cadastrado (opcional)
+          <select id="t-treino"></select>
+        </label>
         <div class="duas">
           <label>Dia<input id="t-dia" type="date"></label>
           <label>Minutos<input id="t-minutos" type="number" inputmode="numeric" min="1" max="600" placeholder="ex.: 50"></label>
         </div>
         <button class="primario" type="submit">Salvar treino</button>
       </form>
-      <div class="muted pequeno legenda">O treino de um dia aumenta a meta recomendada de água do dia seguinte. Fez musculação e cárdio? Registre os dois.</div>
+      <div class="muted pequeno legenda">O treino aumenta a meta recomendada de água do mesmo dia. Fez musculação e cárdio? Registre os dois.</div>
     </section>
+    <div class="rotulo">Treinos recentes</div>
     <section class="card">
-      <h2>Treinos recentes</h2>
       <ul id="lista-treinos"></ul>
     </section>
   </div>
 
-  <!-- ===== Dieta / Suplementação ===== -->
+  <!-- ===== Dieta / Suplementação (registro do dia) ===== -->
   <div data-secao="dieta" class="escondido">
-    <section class="card em-breve"><div class="ic-grande">🥗</div><b>Dieta chega na próxima versão.</b><div class="muted pequeno">Aqui você vai registrar refeições e acompanhar sua alimentação.</div></section>
+    <section class="card em-breve"><svg class="ic-grande"><use href="#i-dieta"/></svg><b>O registro da dieta chega na próxima versão.</b><div class="muted pequeno">Enquanto isso, já dá para cadastrar seus alimentos em <button class="link" data-ir="cad-alimento">Cadastro › Dieta</button>.</div></section>
   </div>
   <div data-secao="suplementacao" class="escondido">
-    <section class="card em-breve"><div class="ic-grande">💊</div><b>Suplementação chega na próxima versão.</b><div class="muted pequeno">Aqui você vai marcar os suplementos do dia.</div></section>
+    <section class="card em-breve"><svg class="ic-grande"><use href="#i-suplemento"/></svg><b>O registro da suplementação chega na próxima versão.</b><div class="muted pequeno">Enquanto isso, já dá para cadastrar seus suplementos em <button class="link" data-ir="cad-suplemento">Cadastro › Suplemento</button>.</div></section>
+  </div>
+
+  <!-- ===== Cadastros (treino, exercício, alimento, suplemento) — montado pelo app.js ===== -->
+  <div data-secao="cadastro" class="escondido">
+    <div class="rotulo" id="cad-rotulo-form">Novo</div>
+    <section class="card">
+      <form id="form-cad" class="formulario"></form>
+    </section>
+    <div class="rotulo" id="cad-rotulo-lista">Cadastrados</div>
+    <section class="card">
+      <ul id="lista-cad"></ul>
+    </section>
   </div>
 
   <!-- ===== Perfil ===== -->
   <div data-secao="perfil" class="escondido">
+    <div class="rotulo">Seus dados</div>
     <section class="card">
-      <h2>Seus dados</h2>
       <form id="form-perfil" class="formulario">
         <div class="duas">
           <label>Idade<input id="p-idade" type="number" inputmode="numeric" min="5" max="120" placeholder="anos"></label>
@@ -241,17 +309,16 @@
             <option>Desempenho</option><option>Emagrecimento</option><option>Força</option><option>Funcionalidade</option><option>Hipertrofia</option>
           </select>
         </label>
-        <button class="primario" type="submit">Salvar perfil</button>
         <div class="muted pequeno" id="perfil-info"></div>
+        <button class="primario escondido" type="submit" id="btn-salvar-perfil">Salvar alterações</button>
       </form>
     </section>
-    <section class="card">
-      <h2>Conta</h2>
-      <div class="conta">
-        <div id="conta-email"></div>
-        <a id="link-planilha" class="escondido" target="_blank" rel="noopener">Abrir minha planilha</a>
-        <button class="link" id="btn-sair">Sair</button>
-      </div>
+    <section class="card conta">
+      <div class="muted">Conta</div>
+      <div id="conta-email"></div>
+      <button class="link" id="btn-backup">Realizar backup</button>
+      <button class="link" id="btn-sair">Sair</button>
+      <div class="muted pequeno" id="backup-info">O backup envia para o seu e-mail um arquivo .csv com todos os seus dados.</div>
     </section>
   </div>
   </main>
