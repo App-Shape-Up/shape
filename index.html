@@ -78,10 +78,9 @@
   <!-- ===== Início ===== -->
   <div data-secao="home" class="escondido">
     <div class="rotulo">Cadastro <button class="info" data-info="info-cad" aria-label="O que é o cadastro"><svg><use href="#i-info"/></svg></button></div>
-    <p class="info-texto escondido" id="info-cad">Cadastre diferentes treinos, exercícios que irão fazer parte desses treinos, alimentos e suplementos que irão compor sua dieta.</p>
-    <div class="grade-cad">
+    <p class="info-texto escondido" id="info-cad">Cadastre seus treinos mais comuns (para registrar com um toque), os alimentos e os suplementos que irão compor sua dieta.</p>
+    <div class="grade-cad tres">
       <button class="btn-cad" data-ir="cad-treino">Treino</button>
-      <button class="btn-cad" data-ir="cad-exercicio">Exercício</button>
       <button class="btn-cad" data-ir="cad-alimento">Dieta</button>
       <button class="btn-cad" data-ir="cad-suplemento">Suplemento</button>
     </div>
@@ -230,67 +229,50 @@
 
   <!-- ===== Treino (registro do dia) ===== -->
   <div data-secao="treino" class="escondido">
-    <div class="rotulo">Treino de hoje <span class="rot-dir" id="hp-plano"></span></div>
-    <section class="card" id="hp-card">
-      <div class="dias-chips" id="hp-dias" role="group" aria-label="Dia do plano"></div>
-      <div class="dia-titulo" id="hp-titulo"></div>
-      <ul class="lista-ex" id="hp-lista"></ul>
-      <div class="linha">
-        <input id="hp-minutos" type="number" inputmode="numeric" min="1" max="600" placeholder="Minutos de treino">
-        <button class="primario" id="hp-concluir">Concluí</button>
-      </div>
-      <div class="nota-meta" id="hp-feito"></div>
-    </section>
-    <section class="card em-breve escondido" id="hp-sem-plano">
-      <svg class="ic-grande"><use href="#i-treino"/></svg>
-      <b>Você ainda não tem um plano de treino ativo.</b>
-      <div class="muted pequeno">Monte um plano de 7 dias (ou comece de um modelo pronto) e o treino de cada dia aparece aqui.</div>
-      <button class="primario" data-ir="cad-treino">Montar meu plano</button>
+    <div class="rotulo">Esta semana</div>
+    <section class="card resumo-semana">
+      <div><b id="ts-qtd">0</b><span>treinos</span></div>
+      <div><b id="ts-min">0</b><span>minutos</span></div>
+      <div><b id="ts-kcal">0</b><span>kcal ativas</span></div>
+      <div><b id="ts-km">0</b><span>km</span></div>
     </section>
 
-    <div class="rotulo">Registrar outro treino</div>
+    <div class="rotulo" id="t-rotulo-form">Registrar treino</div>
     <section class="card">
+      <div class="escolhas salvos escondido" id="t-salvos"></div>
       <form id="form-treino" class="formulario">
-        <div class="segmentado" role="group" aria-label="Tipo de treino">
-          <button type="button" data-tipo="musculacao" aria-pressed="true">Musculação</button>
-          <button type="button" data-tipo="cardio" aria-pressed="false">Cárdio</button>
-        </div>
+        <label>Atividade<select id="t-atividade"></select></label>
         <div class="duas">
           <label>Dia<input id="t-dia" type="date"></label>
-          <label>Minutos<input id="t-minutos" type="number" inputmode="numeric" min="1" max="600" placeholder="ex.: 50"></label>
+          <label>Início<input id="t-hora" type="time"></label>
         </div>
-        <button class="primario" type="submit">Salvar treino</button>
+        <div class="duas">
+          <label>Duração (min)<input id="t-minutos" type="number" inputmode="numeric" min="1" max="600" placeholder="ex.: 50"></label>
+          <label>Local<select id="t-local"><option value="">—</option><option>Interno</option><option>Externo</option></select></label>
+        </div>
+        <div class="duas">
+          <label>Calorias ativas<input id="t-kcal_ativas" type="number" inputmode="numeric" min="0" placeholder="kcal"></label>
+          <label>Calorias totais<input id="t-kcal_totais" type="number" inputmode="numeric" min="0" placeholder="kcal"></label>
+        </div>
+        <div class="duas">
+          <label id="rot-distancia">Distância (km)<input id="t-distancia_km" type="number" inputmode="decimal" step="0.01" min="0" placeholder="ex.: 5,2"></label>
+          <label>FC média (bpm)<input id="t-fc_media" type="number" inputmode="numeric" min="30" max="230" placeholder="ex.: 135"></label>
+        </div>
+        <label>Esforço <span class="esforco-txt" id="t-esforco-txt">toque para avaliar</span>
+          <div class="esforco" id="t-esforco" role="radiogroup" aria-label="Esforço de 1 a 10"></div>
+        </label>
+        <label>Observações<input id="t-obs" placeholder="opcional"></label>
+        <div class="form-botoes">
+          <button class="primario" type="submit" id="t-salvar">Salvar treino</button>
+          <button class="cinza escondido" type="button" id="t-cancelar">Cancelar</button>
+        </div>
       </form>
-      <div class="muted pequeno legenda">O treino aumenta a meta recomendada de água do mesmo dia. Fez musculação e cárdio? Registre os dois.</div>
+      <div class="muted pequeno legenda">Só atividade e duração são obrigatórias. Os números você encontra no relógio ou no app de treino do celular. O treino também aumenta a meta de água do dia.</div>
     </section>
+
     <div class="rotulo">Treinos recentes</div>
     <section class="card">
       <ul id="lista-treinos"></ul>
-    </section>
-  </div>
-
-  <!-- ===== Planos de treino (cadastro) ===== -->
-  <div data-secao="cad-treino" class="escondido">
-    <div class="rotulo">Plano atual <button class="info" data-info="info-planos" aria-label="Como funcionam os planos"><svg><use href="#i-info"/></svg></button></div>
-    <p class="info-texto escondido" id="info-planos">Um plano é a sua divisão de treino (por exemplo, 7 dias por grupo muscular e cárdio) válida por um período, normalmente um mês. Quando ele estiver acabando, duplique e ajuste para o próximo mês.</p>
-    <section class="card" id="pl-atual"></section>
-    <button class="primario largo" id="pl-novo"><svg><use href="#i-mais"/></svg> Novo plano</button>
-    <div class="rotulo">Todos os planos</div>
-    <section class="card"><ul id="pl-lista"></ul></section>
-  </div>
-
-  <!-- ===== Editor de um plano ===== -->
-  <div data-secao="plano" class="escondido">
-    <section class="card plano-cab">
-      <div class="item-txt"><b id="pe-nome"></b><small id="pe-datas"></small></div>
-      <button class="cinza" id="pe-editar">Editar</button>
-    </section>
-    <div class="dias-chips" id="pe-dias" role="group" aria-label="Dia do plano"></div>
-    <section class="card">
-      <input id="pe-dia-nome" placeholder="Nome do dia" aria-label="Nome do dia">
-      <ul class="lista-ex" id="pe-lista"></ul>
-      <button class="primario largo" id="pe-add"><svg><use href="#i-mais"/></svg> Adicionar exercícios</button>
-      <div class="muted pequeno legenda">Toque num exercício para mudar séries, repetições, técnica e carga. Exercícios seguidos com Bi-set, Tri-set e parecidos ficam agrupados.</div>
     </section>
   </div>
 
@@ -312,14 +294,6 @@
     <section class="card">
       <ul id="lista-cad"></ul>
     </section>
-    <div id="cad-biblioteca" class="escondido">
-      <div class="rotulo">Biblioteca <span class="rot-dir" id="bib-qtd"></span></div>
-      <section class="card">
-        <input id="bib-busca" type="search" placeholder="Buscar exercício, grupo ou equipamento" aria-label="Buscar na biblioteca">
-        <div class="chips-grupos" id="bib-grupos"></div>
-        <ul class="lista-bib" id="bib-lista"></ul>
-      </section>
-    </div>
   </div>
 
   <!-- ===== Perfil ===== -->
@@ -372,76 +346,9 @@
   </main>
 </div>
 
-<!-- Janelas que sobem de baixo -->
-<div class="folha escondido" id="folha-picker" role="dialog" aria-modal="true" aria-labelledby="fp-titulo">
-  <div class="folha-caixa">
-    <div class="folha-cab"><b id="fp-titulo">Adicionar exercícios</b><button class="primario" id="fp-fechar">Concluir</button></div>
-    <div class="fp-padrao">
-      <label>Séries<input id="fp-series" type="number" inputmode="numeric" min="1" max="20" value="4"></label>
-      <label>Repetições<input id="fp-reps" value="12"></label>
-      <label class="fp-tec">Técnica<select id="fp-tecnica"></select></label>
-    </div>
-    <input id="fp-busca" type="search" placeholder="Buscar: supino, halteres, glúteos…" aria-label="Buscar exercício">
-    <div class="chips-grupos" id="fp-grupos"></div>
-    <div class="fp-info pequeno muted" id="fp-info">Toque para adicionar ao dia. Pode escolher vários.</div>
-    <ul class="lista-bib" id="fp-lista"></ul>
-  </div>
-</div>
-
-<div class="folha escondido" id="folha-item" role="dialog" aria-modal="true" aria-labelledby="fi-nome">
-  <div class="folha-caixa">
-    <div class="folha-cab"><div class="item-txt"><b id="fi-nome"></b><small id="fi-det"></small></div><button class="cinza" id="fi-fechar" aria-label="Fechar">✕</button></div>
-    <form id="form-item" class="formulario">
-      <div class="duas">
-        <label>Séries<input id="fi-series" type="number" inputmode="numeric" min="1" max="20"></label>
-        <label>Repetições<input id="fi-reps" placeholder="ex.: 12 ou 8-10"></label>
-      </div>
-      <label>Técnica<select id="fi-tecnica"></select></label>
-      <div class="desc-tecnica" id="fi-tec-desc"></div>
-      <div class="duas">
-        <label>Carga<input id="fi-carga" placeholder="ex.: 20 kg"></label>
-        <label>Descanso<input id="fi-descanso" placeholder="ex.: 60 s"></label>
-      </div>
-      <label>Observação<input id="fi-obs" placeholder="opcional"></label>
-      <div class="form-botoes"><button class="primario" type="submit">Salvar</button><button class="cinza perigo" type="button" id="fi-remover">Remover</button></div>
-    </form>
-  </div>
-</div>
-
-<div class="folha escondido" id="folha-plano" role="dialog" aria-modal="true" aria-labelledby="fpl-titulo">
-  <div class="folha-caixa">
-    <div class="folha-cab"><b id="fpl-titulo">Novo plano</b><button class="cinza" id="fpl-fechar" aria-label="Fechar">✕</button></div>
-    <form id="form-plano" class="formulario">
-      <label id="fpl-origem-rot">Começar
-        <select id="fpl-origem"></select>
-      </label>
-      <label>Nome do plano<input id="fpl-nome" placeholder="ex.: Hipertrofia – dezembro" required></label>
-      <div class="duas">
-        <label>Início<input id="fpl-inicio" type="date" required></label>
-        <label>Fim<input id="fpl-fim" type="date" required></label>
-      </div>
-      <div class="duas">
-        <label>Dias de treino
-          <select id="fpl-dias"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option selected>7</option></select>
-        </label>
-        <label>Objetivo
-          <select id="fpl-objetivo"><option value="">—</option><option>Desempenho</option><option>Emagrecimento</option><option>Força</option><option>Funcionalidade</option><option>Hipertrofia</option></select>
-        </label>
-      </div>
-      <label>Observação<input id="fpl-obs" placeholder="opcional"></label>
-      <button class="primario" type="submit" id="fpl-salvar">Criar plano</button>
-      <div class="form-botoes escondido" id="fpl-extras">
-        <button class="cinza" type="button" id="fpl-duplicar">Duplicar para o próximo mês</button>
-        <button class="cinza perigo" type="button" id="fpl-apagar">Apagar</button>
-      </div>
-    </form>
-  </div>
-</div>
-
 <div class="aviso" id="aviso" role="status"></div>
 
 <script src="config.js"></script>
-<script src="catalogo.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
