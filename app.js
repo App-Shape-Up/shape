@@ -1159,20 +1159,21 @@
     if (tokenValido() || conta) abrirApp(); else mostrar('login');
   })();
 
-  // Menu de baixo sempre colado no fim da tela.
-  // No app instalado do iPhone, ao abrir, o iOS às vezes calcula a altura da tela sem a barra de status
-  // e o menu "flutua" um pouco acima do fim (só se corrige depois de rolar a página, e a tela inicial não rola).
+  // Menu de baixo no fim da tela.
+  // No app instalado do iPhone, o iOS às vezes deixa uma faixa no fim da tela fora da área da página
+  // (a página fica mais baixa que a tela). Essa faixa não mostra nada do app, então mover o menu para lá
+  // corta os ícones. Em vez disso, quando a faixa existe, ela já faz o papel da área do "risquinho" do iPhone
+  // e o menu tira o espaço extra de baixo, ficando com os ícones logo acima dela.
   function colarMenu() {
     const menu = document.querySelector('.menu');
-    if (!menu || $('tela-app').classList.contains('escondido') || getComputedStyle(menu).bottom !== '0px' || window.innerWidth >= 820) { if (menu) menu.style.transform = ''; return; }
+    if (!menu) return;
     menu.style.transform = '';
-    let alturaTela = window.innerHeight;
-    if (navigator.standalone) {
+    let faixa = 0;
+    if (navigator.standalone && window.innerWidth < 820) {
       const retrato = window.matchMedia('(orientation: portrait)').matches;
-      alturaTela = Math.max(alturaTela, retrato ? screen.height : screen.width);
+      faixa = Math.round((retrato ? screen.height : screen.width) - window.innerHeight);
     }
-    const sobra = Math.round(alturaTela - menu.getBoundingClientRect().bottom);
-    if (sobra > 1 && sobra < 120) menu.style.transform = 'translateY(' + sobra + 'px)';
+    menu.classList.toggle('sem-folga', faixa > 1 && faixa < 120);
   }
   ['resize', 'orientationchange', 'pageshow', 'load'].forEach((ev) => window.addEventListener(ev, () => setTimeout(colarMenu, 60)));
   window.addEventListener('scroll', colarMenu, { passive: true });
