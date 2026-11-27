@@ -20,27 +20,23 @@
     Agua:    ['id', 'dia', 'quantidade_ml', 'registrado_em'],
     Metas:   ['id', 'modulo', 'tipo', 'valor', 'unidade', 'valida_desde', 'registrado_em'],
     Perfil:  ['id', 'idade', 'peso_kg', 'altura_cm', 'tempo_treino', 'condicionamento', 'objetivo', 'registrado_em'],
-    Treinos: ['id', 'dia', 'tipo', 'minutos', 'registrado_em', 'treino_id'],
+    // tipo = musculacao | cardio (usado na meta de água); atividade = nome escolhido (Corrida, Musculação…)
+    Treinos: ['id', 'dia', 'tipo', 'minutos', 'registrado_em', 'treino_id', 'atividade', 'hora', 'local',
+      'kcal_ativas', 'kcal_totais', 'distancia_km', 'fc_media', 'esforco', 'obs'],
+    // treinos que a pessoa repete sempre, para registrar com um toque
+    'Meus Treinos':    ['id', 'nome', 'atividade', 'minutos', 'local', 'obs', 'registrado_em'],
     // Cadastros (a pessoa monta uma vez e usa no dia a dia)
-    'Cad Exercicios':  ['id', 'nome', 'grupo', 'obs', 'registrado_em', 'variacao', 'pegada', 'equipamento', 'nivel', 'categoria'],
     'Cad Alimentos':   ['id', 'nome', 'porcao', 'kcal', 'proteina_g', 'carbo_g', 'gordura_g', 'registrado_em'],
     'Cad Suplementos': ['id', 'nome', 'dose', 'horario', 'obs', 'registrado_em'],
-    // Planos de treino (periodização): um plano tem N dias (normalmente 7), cada dia tem uma lista de exercícios.
-    // "aluno" fica vazio por enquanto (o plano é da própria pessoa); servirá para a versão de treinadores.
-    Planos:           ['id', 'nome', 'inicio', 'fim', 'dias', 'objetivo', 'obs', 'aluno', 'registrado_em'],
-    'Plano Dias':     ['id', 'plano_id', 'dia', 'nome', 'registrado_em'],
-    'Plano Itens':    ['id', 'plano_id', 'dia', 'ordem', 'exercicio', 'series', 'repeticoes', 'tecnica', 'carga', 'descanso', 'obs', 'registrado_em'],
   };
   // nome da lista no aparelho para cada aba
   const CHAVES = {
     Agua: 'agua', Metas: 'metas', Perfil: 'perfil', Treinos: 'treinos',
-    Planos: 'planos', 'Plano Dias': 'planoDias', 'Plano Itens': 'planoItens',
-    'Cad Exercicios': 'cadExercicios', 'Cad Alimentos': 'cadAlimentos', 'Cad Suplementos': 'cadSuplementos',
+    'Meus Treinos': 'meusTreinos', 'Cad Alimentos': 'cadAlimentos', 'Cad Suplementos': 'cadSuplementos',
   };
   const NUMEROS = {
-    Agua: ['quantidade_ml'], Metas: ['valor'], Perfil: ['idade', 'peso_kg', 'altura_cm'], Treinos: ['minutos'],
+    Agua: ['quantidade_ml'], Metas: ['valor'], Perfil: ['idade', 'peso_kg', 'altura_cm'], Treinos: ['minutos', 'kcal_ativas', 'kcal_totais', 'distancia_km', 'fc_media', 'esforco'], 'Meus Treinos': ['minutos'],
     'Cad Alimentos': ['kcal', 'proteina_g', 'carbo_g', 'gordura_g'],
-    Planos: ['dias'], 'Plano Dias': ['dia'], 'Plano Itens': ['dia', 'ordem', 'series'],
   };
   const ESCOPO_GMAIL = 'https://www.googleapis.com/auth/gmail.send';
   // Abas de leitura (fórmulas) para o painel. O app cria uma vez e não mexe mais.
@@ -236,7 +232,7 @@
     const o = {};
     TABELAS[tabela].forEach((c, i) => { o[c] = linha[i] === undefined ? '' : linha[i]; });
     // se alguém editou a planilha à mão, a data pode ter virado número de série
-    ['dia', 'valida_desde', 'inicio', 'fim'].forEach((c) => {
+    ['dia', 'valida_desde'].forEach((c) => {
       if (typeof o[c] === 'number') o[c] = iso(new Date(Date.UTC(1899, 11, 30) + o[c] * 86400000 + 43200000));
     });
     (NUMEROS[tabela] || []).forEach((c) => { if (o[c] !== '') o[c] = Number(String(o[c]).replace(',', '.')) || 0; });
@@ -360,9 +356,7 @@
     treino: ['Treino', 'treino', 'home'],
     dieta: ['Dieta', 'dieta', 'home'],
     suplementacao: ['Suplementação', 'suplemento', 'home'],
-    'cad-treino': ['Planos de treino', 'treino', 'home'],
-    plano: ['Plano de treino', 'treino', 'cad-treino'],
-    'cad-exercicio': ['Cadastro de exercícios', 'exercicio', 'home', 'cadastro'],
+    'cad-treino': ['Meus treinos', 'treino', 'home', 'cadastro'],
     'cad-alimento': ['Cadastro de alimentos', 'dieta', 'home', 'cadastro'],
     'cad-suplemento': ['Cadastro de suplementos', 'suplemento', 'home', 'cadastro'],
   };
@@ -389,6 +383,7 @@
     document.title = secao === 'home' ? 'ShapeUp' : titulo + ' · ShapeUp';
     window.scrollTo(0, 0);
     desenhar();
+    setTimeout(colarMenu, 30);
   }
   document.querySelectorAll('[data-ir]').forEach((b) => { b.onclick = () => irPara(b.dataset.ir); });
   $('voltar').onclick = () => irPara(SECOES[secao][2] || 'home');
@@ -466,486 +461,134 @@
     return { ml, treinos: ts, minutos: min, cardio: temCardio };
   }
 
-  let tipoTreino = 'musculacao';
-  function escolherTipo(tipo) {
-    tipoTreino = tipo;
-    document.querySelectorAll('[data-tipo]').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.tipo === tipo)));
+  // Atividades: [nome, conta como (musculacao | cardio) para a meta de água, tem distância]
+  const ATIVIDADES = [
+    ['Musculação', 'musculacao'], ['Treino funcional', 'musculacao'], ['HIIT', 'cardio'],
+    ['Corrida', 'cardio', 1], ['Caminhada', 'cardio', 1], ['Ciclismo', 'cardio', 1], ['Bike ergométrica', 'cardio', 1],
+    ['Natação', 'cardio', 1], ['Elíptico', 'cardio'], ['Escada', 'cardio'], ['Remo', 'cardio', 1],
+    ['Esportes (futebol, tênis…)', 'cardio'], ['Lutas', 'cardio'], ['Dança', 'cardio'],
+    ['Yoga', 'musculacao'], ['Pilates', 'musculacao'], ['Alongamento / mobilidade', 'musculacao'], ['Outro', 'cardio'],
+  ];
+  const ATIV = {}; ATIVIDADES.forEach((a) => { ATIV[a[0]] = { tipo: a[1], distancia: !!a[2] }; });
+  const NOMES_ATIV = ATIVIDADES.map((a) => a[0]);
+  const ESFORCO = (n) => (n <= 3 ? 'Fácil' : n <= 6 ? 'Moderado' : n <= 8 ? 'Difícil' : 'Máximo');
+  const nomeAtividade = (t) => t.atividade || TIPOS_TREINO[t.tipo] || t.tipo;
+  const num = (v, casas) => Number(v).toLocaleString('pt-BR', { maximumFractionDigits: casas || 0 });
+
+  (function montarForm() {
+    const sel = $('t-atividade');
+    NOMES_ATIV.forEach((n) => sel.appendChild(el('option', '', n)));
+    const box = $('t-esforco');
+    for (let i = 1; i <= 10; i++) {
+      const b = el('button', 'e' + Math.ceil(i / 2.5), String(i)); b.type = 'button'; b.setAttribute('role', 'radio'); b.dataset.v = i;
+      b.onclick = () => marcarEsforco(Number($('t-esforco').dataset.v) === i ? '' : i);
+      box.appendChild(b);
+    }
+  })();
+  function marcarEsforco(v) {
+    $('t-esforco').dataset.v = v || '';
+    $('t-esforco').querySelectorAll('button').forEach((b) => b.setAttribute('aria-checked', String(v && Number(b.dataset.v) <= v)));
+    $('t-esforco-txt').textContent = v ? v + ' · ' + ESFORCO(v) : 'toque para avaliar';
   }
-  document.querySelectorAll('[data-tipo]').forEach((b) => { b.onclick = () => escolherTipo(b.dataset.tipo); });
+  function ajustarCampos() {
+    const a = ATIV[$('t-atividade').value] || {};
+    $('rot-distancia').classList.toggle('apagado', !a.distancia);
+  }
+  $('t-atividade').addEventListener('change', ajustarCampos);
+
+  let treinoEditando = null;
+  const CAMPOS_TREINO = ['minutos', 'kcal_ativas', 'kcal_totais', 'distancia_km', 'fc_media', 'obs', 'local', 'hora', 'dia', 'atividade'];
+  function preencherFormTreino(t) {
+    CAMPOS_TREINO.forEach((c) => { $('t-' + c).value = t && t[c] !== undefined && t[c] !== '' ? String(t[c]) : ''; });
+    if (!t || !t.atividade) $('t-atividade').value = t && t.tipo === 'cardio' ? 'Outro' : 'Musculação';
+    if (!$('t-dia').value) $('t-dia').value = hoje();
+    marcarEsforco(t && t.esforco ? Number(t.esforco) : '');
+    ajustarCampos();
+  }
+  function limparFormTreino() {
+    treinoEditando = null; preencherFormTreino(null);
+    const d = new Date(); $('t-hora').value = dd(d.getHours()) + ':' + dd(d.getMinutes());
+    $('t-rotulo-form').textContent = 'Registrar treino'; $('t-salvar').textContent = 'Salvar treino';
+    $('t-cancelar').classList.add('escondido');
+  }
+  $('t-cancelar').onclick = limparFormTreino;
 
   $('form-treino').addEventListener('submit', (e) => {
     e.preventDefault();
     const dia = $('t-dia').value || hoje();
     const min = Math.round(Number($('t-minutos').value));
-    if (!(min >= 1 && min <= 600)) { avisar('Informe os minutos de treino (1 a 600)'); $('t-minutos').focus(); return; }
+    if (!(min >= 1 && min <= 600)) { avisar('Informe a duração em minutos (1 a 600)'); $('t-minutos').focus(); return; }
     if (dia > hoje()) { avisar('A data não pode ser no futuro'); return; }
-    registrar('Treinos', { id: novoId(), dia, tipo: tipoTreino, minutos: min, registrado_em: new Date().toISOString(), treino_id: '' });
-    $('t-minutos').value = '';
-    desenhar(); atualizarStatus(); avisar(TIPOS_TREINO[tipoTreino] + ': ' + min + ' min'); sincronizar();
-  });
-
-  // ---------- Biblioteca de exercícios e técnicas ----------
-  const CAT = window.SHAPE_CATALOGO || { exercicios: [], tecnicas: [], modelos: [] };
-  const BIB = {};
-  CAT.exercicios.forEach((r) => { BIB[r[0]] = { id: r[0], grupo: r[1], nome: r[2], variacao: r[3], pegada: r[4], equipamento: r[5], nivel: r[6], categoria: r[7] || '', bib: true }; });
-  const GRUPOS_MUSC = [];
-  CAT.exercicios.forEach((r) => { if (GRUPOS_MUSC.indexOf(r[1]) < 0) GRUPOS_MUSC.push(r[1]); });
-  const TECNICAS = CAT.tecnicas.map((t) => t[0]);
-  const DESC_TECNICA = {}; CAT.tecnicas.forEach((t) => { DESC_TECNICA[t[0]] = t[1]; });
-  // técnicas que juntam exercícios seguidos (quantos por grupo)
-  const AGRUPA = { 'Bi-set': 2, 'Tri-set': 3, 'Agonista/Antagonista': 2, 'Pré-exaustão': 2, 'Super série': 99, 'Circuito': 99 };
-
-  const exercicio = (id) => BIB[id] || estado.cadExercicios.find((x) => x.id === id) || { id, nome: 'Exercício apagado', grupo: '' };
-  const todosExercicios = () => Object.values(BIB).concat(estado.cadExercicios.map((x) => Object.assign({}, x, { meu: true })));
-  const nomeExercicio = (e) => e.nome + (e.variacao ? ' ' + e.variacao : '');
-  function detalheExercicio(e) {
-    return [e.grupo, e.pegada ? 'pegada ' + e.pegada.toLowerCase() : '', e.equipamento].filter(Boolean).join(' · ');
-  }
-  const semAcento = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-  // Categoria = subdivisão do exercício dentro do grupo muscular (ex.: Dorsal A = remadas, B = puxadas)
-  const CATEGORIAS = CAT.categorias || {};
-  const categoriasDo = (grupo) => Object.keys(CATEGORIAS).filter((k) => k.split('|')[0] === grupo).map((k) => k.split('|')[1]).sort();
-  function filtrarExercicios(busca, grupo, categoria) {
-    const palavras = semAcento(busca).split(/\s+/).filter(Boolean);
-    return todosExercicios().filter((e) => {
-      if (grupo && e.grupo !== grupo) return false;
-      if (categoria && e.categoria !== categoria) return false;
-      if (!palavras.length) return true;
-      const t = semAcento([e.grupo, e.nome, e.variacao, e.pegada, e.equipamento, e.nivel].join(' '));
-      return palavras.every((p) => t.indexOf(p) >= 0);
-    }).sort((x, y) => (x.meu === y.meu ? 0 : x.meu ? -1 : 1) || GRUPOS_MUSC.indexOf(x.grupo) - GRUPOS_MUSC.indexOf(y.grupo) || String(x.categoria || 'Z').localeCompare(String(y.categoria || 'Z')) || x.nome.localeCompare(y.nome, 'pt-BR'));
-  }
-  function linhaExercicio(e, extra) {
-    const li = el('li', 'item-bib');
-    const t = el('div', 'item-txt');
-    const n = el('span', 'ml', nomeExercicio(e)); if (e.meu) n.appendChild(el('i', 'selo', 'meu'));
-    t.appendChild(n);
-    const det = [detalheExercicio(e), e.nivel].filter(Boolean).join(' · ');
-    t.appendChild(el('small', '', e.categoria ? det.replace(e.grupo, e.grupo + ' ' + e.categoria) : det));
-    li.appendChild(t); if (extra) li.appendChild(extra);
-    return li;
-  }
-  function chipsGrupos(box, atual, aoEscolher) {
-    box.innerHTML = '';
-    [''].concat(GRUPOS_MUSC).forEach((g) => {
-      const b = el('button', '', g || 'Todos'); b.type = 'button'; b.setAttribute('aria-pressed', String(g === atual));
-      b.onclick = () => aoEscolher(g); box.appendChild(b);
-    });
-  }
-  // segunda linha de botões: categorias do grupo escolhido
-  function chipsCategorias(box, grupo, atual, aoEscolher) {
-    box.innerHTML = '';
-    const cs = grupo ? categoriasDo(grupo) : [];
-    box.classList.toggle('escondido', cs.length < 2);
-    if (cs.length < 2) return;
-    [''].concat(cs).forEach((c) => {
-      const b = el('button', 'chip-cat'); b.type = 'button'; b.setAttribute('aria-pressed', String(c === atual));
-      if (c) { b.appendChild(el('b', '', c)); b.appendChild(el('span', '', CATEGORIAS[grupo + '|' + c] || '')); } else b.textContent = 'Todas';
-      b.onclick = () => aoEscolher(c); box.appendChild(b);
-    });
-  }
-  function preencherTecnicas(sel) { sel.innerHTML = ''; TECNICAS.forEach((t) => sel.appendChild(el('option', '', t))); }
-  preencherTecnicas($('fp-tecnica')); preencherTecnicas($('fi-tecnica'));
-
-  // ---------- Planos de treino ----------
-  const fmtData = (d) => (d ? diaCurto(d) + '/' + d.slice(2, 4) : '');
-  const somaMes = (dia, n) => { const d = new Date(dia + 'T12:00:00'); const alvo = d.getDate(); d.setDate(1); d.setMonth(d.getMonth() + n); d.setDate(Math.min(alvo, new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate())); return iso(d); };
-  const planosOrdenados = () => estado.planos.slice().sort((a, b) => (a.inicio < b.inicio ? 1 : a.inicio > b.inicio ? -1 : 0));
-  const planoAtual = () => planosOrdenados().find((p) => p.inicio <= hoje() && p.fim >= hoje()) || null;
-  const plano = (id) => estado.planos.find((p) => p.id === id);
-  const itensDoDia = (pid, dia) => estado.planoItens.filter((i) => i.plano_id === pid && i.dia === dia).sort((a, b) => a.ordem - b.ordem);
-  const registroDoDia = (pid, dia) => estado.planoDias.find((d) => d.plano_id === pid && d.dia === dia);
-  function nomeAutomatico(pid, dia) {
-    const gs = [];
-    itensDoDia(pid, dia).forEach((i) => { const g = exercicio(i.exercicio).grupo; if (g && gs.indexOf(g) < 0) gs.push(g); });
-    if (!gs.length) return '';
-    return gs.length === 1 ? gs[0] : gs.slice(0, -1).join(', ') + ' e ' + gs[gs.length - 1];
-  }
-  const nomeDia = (pid, dia) => { const r = registroDoDia(pid, dia); return (r && r.nome) || nomeAutomatico(pid, dia) || 'Descanso'; };
-  const resumoSerie = (i) => [i.series && i.repeticoes ? i.series + '×' + i.repeticoes : i.series ? i.series + ' séries' : i.repeticoes, i.tecnica !== 'Comum' ? i.tecnica : '', i.carga].filter(Boolean).join(' · ');
-
-  // Lista de exercícios de um dia, agrupando bi-set / tri-set / etc.
-  function desenharItens(ul, itens, modo, feitos) {
-    ul.innerHTML = '';
-    if (!itens.length) { ul.appendChild(el('li', 'vazio', modo === 'editar' ? 'Nenhum exercício neste dia ainda.' : 'Dia de descanso.')); return; }
-    let k = 0;
-    while (k < itens.length) {
-      const tam = AGRUPA[itens[k].tecnica];
-      let n = 1;
-      if (tam) while (k + n < itens.length && n < tam && itens[k + n].tecnica === itens[k].tecnica) n++;
-      const bloco = itens.slice(k, k + n);
-      const destino = n > 1 ? el('li', 'grupo-ex') : ul;
-      if (n > 1) { destino.appendChild(el('div', 'grupo-rot', bloco[0].tecnica)); ul.appendChild(destino); }
-      const lista = n > 1 ? el('ul') : ul;
-      if (n > 1) destino.appendChild(lista);
-      bloco.forEach((i) => {
-        const e = exercicio(i.exercicio);
-        const li = el('li', 'item-ex' + (feitos && feitos.indexOf(i.id) >= 0 ? ' feito' : ''));
-        li.appendChild(el('span', 'num-ex', String(itens.indexOf(i) + 1)));
-        const t = el('div', 'item-txt');
-        t.appendChild(el('span', 'ml', nomeExercicio(e)));
-        t.appendChild(el('small', '', [resumoSerie(i), e.equipamento].filter(Boolean).join(' · ')));
-        if (i.obs) t.appendChild(el('small', 'obs-ex', i.obs));
-        li.appendChild(t);
-        if (modo === 'editar') {
-          const ac = el('div', 'acoes');
-          const pos = itens.indexOf(i);
-          const sobe = el('button', 'seta', '↑'); sobe.setAttribute('aria-label', 'Subir'); sobe.disabled = pos === 0;
-          const desce = el('button', 'seta', '↓'); desce.setAttribute('aria-label', 'Descer'); desce.disabled = pos === itens.length - 1;
-          sobe.onclick = (ev) => { ev.stopPropagation(); trocarOrdem(itens, pos, pos - 1); };
-          desce.onclick = (ev) => { ev.stopPropagation(); trocarOrdem(itens, pos, pos + 1); };
-          ac.appendChild(sobe); ac.appendChild(desce); li.appendChild(ac);
-          li.onclick = () => abrirItem(i);
-        } else {
-          const ck = el('span', 'check', '✓'); li.appendChild(ck);
-          li.onclick = () => marcarFeito(i.id);
-        }
-        lista.appendChild(li);
-      });
-      k += n;
-    }
-  }
-
-  // troca a posição de dois exercícios (regrava as duas linhas)
-  function trocarOrdem(itens, a, b) {
-    const x = itens[a], y = itens[b];
-    const nx = Object.assign({}, x, { ordem: y.ordem, registrado_em: new Date().toISOString() });
-    const ny = Object.assign({}, y, { ordem: x.ordem, registrado_em: new Date().toISOString() });
-    if (nx.ordem === ny.ordem) ny.ordem = nx.ordem + (b > a ? -1 : 1) * 0.5;
-    remover('Plano Itens', x.id); remover('Plano Itens', y.id);
-    registrar('Plano Itens', nx); registrar('Plano Itens', ny);
-    desenhar(); atualizarStatus(); sincronizar();
-  }
-
-  // ----- lista de planos -----
-  let planoAberto = guardar.ler('shape-plano-aberto', null);
-  let diaAberto = 1;
-  function abrirPlano(id, dia) {
-    planoAberto = id; diaAberto = dia || 1; guardar.gravar('shape-plano-aberto', id);
-    irPara('plano');
-  }
-  function statusPlano(p) {
-    if (p.fim < hoje()) return 'encerrado';
-    if (p.inicio > hoje()) return 'próximo';
-    return 'em andamento';
-  }
-  function desenharPlanos() {
-    const at = planoAtual();
-    const box = $('pl-atual'); box.innerHTML = '';
-    if (at) {
-      const total = Math.round((new Date(at.fim) - new Date(at.inicio)) / 864e5) + 1;
-      const passou = Math.round((new Date(hoje()) - new Date(at.inicio)) / 864e5) + 1;
-      const t = el('div', 'item-txt'); t.appendChild(el('b', 'grande-nome', at.nome));
-      t.appendChild(el('small', '', fmtData(at.inicio) + ' a ' + fmtData(at.fim) + ' · ' + at.dias + ' dias de treino' + (at.objetivo ? ' · ' + at.objetivo : '')));
-      box.appendChild(t);
-      const tr = el('div', 'trilha'); const en = el('div', 'enche rec'); en.style.width = Math.min(100, (passou / total) * 100) + '%'; tr.appendChild(en);
-      box.appendChild(tr);
-      const falta = total - passou;
-      box.appendChild(el('div', 'muted pequeno', falta > 0 ? 'Faltam ' + falta + ' dia(s) para acabar.' : 'Acaba hoje.'));
-      const bs = el('div', 'form-botoes');
-      const ab = el('button', 'primario', 'Abrir plano'); ab.onclick = () => abrirPlano(at.id);
-      bs.appendChild(ab);
-      if (falta <= 7 && !estado.planos.some((p) => p.inicio > at.fim)) {
-        const du = el('button', 'cinza', 'Duplicar para o próximo'); du.onclick = () => abrirFolhaPlano(null, at.id); bs.appendChild(du);
-      }
-      box.appendChild(bs);
-    } else {
-      box.appendChild(el('div', 'muted', estado.planos.length ? 'Nenhum plano valendo hoje.' : 'Você ainda não montou nenhum plano.'));
-    }
-    const ul = $('pl-lista'); ul.innerHTML = '';
-    const ps = planosOrdenados();
-    if (!ps.length) ul.appendChild(el('li', 'vazio', 'Toque em "Novo plano" para começar do zero ou de um modelo pronto.'));
-    ps.forEach((p) => {
-      const li = linhaPlano(p); li.onclick = () => abrirPlano(p.id); ul.appendChild(li);
-    });
-  }
-  function linhaPlano(p) {
-    const li = el('li', 'item-clica');
-    const t = el('div', 'item-txt'); t.appendChild(el('span', 'ml', p.nome));
-    t.appendChild(el('small', '', fmtData(p.inicio) + ' a ' + fmtData(p.fim) + ' · ' + p.dias + ' dias · ' + estado.planoItens.filter((i) => i.plano_id === p.id).length + ' exercícios'));
-    li.appendChild(t);
-    li.appendChild(el('span', 'selo-status ' + statusPlano(p).replace(/[^a-z]/g, ''), statusPlano(p)));
-    return li;
-  }
-  $('pl-novo').onclick = () => abrirFolhaPlano(null, planoAtual() ? planoAtual().id : null);
-
-  // ----- criar / editar / duplicar plano -----
-  let planoEditando = null;
-  function abrirFolha(id) { $(id).classList.remove('escondido'); document.body.classList.add('com-folha'); }
-  function fecharFolha(id) { $(id).classList.add('escondido'); if (!document.querySelector('.folha:not(.escondido)')) document.body.classList.remove('com-folha'); }
-  document.querySelectorAll('.folha').forEach((f) => f.addEventListener('click', (e) => { if (e.target === f) fecharFolha(f.id); }));
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') document.querySelectorAll('.folha:not(.escondido)').forEach((f) => fecharFolha(f.id)); });
-
-  function abrirFolhaPlano(editarId, origemId) {
-    planoEditando = editarId ? plano(editarId) : null;
-    const novo = !planoEditando;
-    $('fpl-titulo').textContent = novo ? 'Novo plano' : 'Editar plano';
-    $('fpl-salvar').textContent = novo ? 'Criar plano' : 'Salvar';
-    $('fpl-origem-rot').classList.toggle('escondido', !novo);
-    $('fpl-extras').classList.toggle('escondido', novo);
-    const sel = $('fpl-origem'); sel.innerHTML = '';
-    sel.appendChild(el('option', '', 'Em branco')).value = '';
-    if (planosOrdenados().length) {
-      const g = el('optgroup'); g.label = 'Duplicar um plano meu';
-      planosOrdenados().forEach((p) => { const o = el('option', '', p.nome); o.value = 'p:' + p.id; g.appendChild(o); });
-      sel.appendChild(g);
-    }
-    const gm = el('optgroup'); gm.label = 'Começar de um modelo';
-    CAT.modelos.forEach((m, i) => { const o = el('option', '', m.nome); o.value = 'm:' + i; gm.appendChild(o); });
-    sel.appendChild(gm);
-    const base = planoEditando || (origemId && plano(origemId));
-    if (planoEditando) {
-      $('fpl-nome').value = planoEditando.nome; $('fpl-inicio').value = planoEditando.inicio; $('fpl-fim').value = planoEditando.fim;
-      $('fpl-dias').value = String(planoEditando.dias); $('fpl-objetivo').value = planoEditando.objetivo || ''; $('fpl-obs').value = planoEditando.obs || '';
-    } else {
-      // começa no dia seguinte ao fim do último plano (ou hoje) e vale um mês
-      const ultimoFim = estado.planos.map((p) => p.fim).sort().pop();
-      const ini = ultimoFim && ultimoFim >= hoje() ? somaDias(ultimoFim, 1) : hoje();
-      $('fpl-inicio').value = ini; $('fpl-fim').value = somaDias(somaMes(ini, 1), -1);
-      sel.value = origemId ? 'p:' + origemId : '';
-      $('fpl-dias').value = base ? String(base.dias) : '7';
-      $('fpl-objetivo').value = base ? base.objetivo || '' : ((perfilAtual() || {}).objetivo || '');
-      $('fpl-obs').value = '';
-      $('fpl-nome').value = sugerirNome(ini, base);
-    }
-    abrirFolha('folha-plano');
-  }
-  function sugerirNome(ini, base) {
-    const mes = new Date(ini + 'T12:00:00').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).replace(' de ', ' ');
-    const obj = (base && base.objetivo) || $('fpl-objetivo').value || 'Treino';
-    return obj + ' – ' + mes;
-  }
-  $('fpl-origem').addEventListener('change', () => {
-    const v = $('fpl-origem').value;
-    if (v.indexOf('p:') === 0) { const p = plano(v.slice(2)); $('fpl-dias').value = String(p.dias); $('fpl-objetivo').value = p.objetivo || ''; }
-    if (v.indexOf('m:') === 0) $('fpl-dias').value = String(CAT.modelos[Number(v.slice(2))].dias.length);
-  });
-  $('fpl-inicio').addEventListener('change', () => { if ($('fpl-inicio').value && !planoEditando) $('fpl-fim').value = somaDias(somaMes($('fpl-inicio').value, 1), -1); });
-  $('fpl-fechar').onclick = () => fecharFolha('folha-plano');
-
-  $('form-plano').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const dados = {
-      nome: $('fpl-nome').value.trim(), inicio: $('fpl-inicio').value, fim: $('fpl-fim').value,
-      dias: Number($('fpl-dias').value), objetivo: $('fpl-objetivo').value, obs: $('fpl-obs').value.trim(),
+    const n = (id) => { const v = String($(id).value).replace(',', '.'); return v === '' ? '' : Math.max(0, Number(v)) || 0; };
+    const atividade = $('t-atividade').value;
+    const t = {
+      id: treinoEditando ? treinoEditando.id : novoId(), dia, tipo: (ATIV[atividade] || {}).tipo || 'cardio', minutos: min,
+      registrado_em: new Date().toISOString(), treino_id: treinoEditando ? treinoEditando.treino_id : (salvoEscolhido || ''),
+      atividade, hora: $('t-hora').value, local: $('t-local').value,
+      kcal_ativas: n('t-kcal_ativas') === '' ? '' : Math.round(n('t-kcal_ativas')), kcal_totais: n('t-kcal_totais') === '' ? '' : Math.round(n('t-kcal_totais')),
+      distancia_km: (ATIV[atividade] || {}).distancia ? n('t-distancia_km') : '', fc_media: n('t-fc_media') === '' ? '' : Math.round(n('t-fc_media')),
+      esforco: Number($('t-esforco').dataset.v) || '', obs: $('t-obs').value.trim(),
     };
-    if (!dados.nome) { avisar('Dê um nome ao plano'); return; }
-    if (!dados.inicio || !dados.fim || dados.fim < dados.inicio) { avisar('Confira as datas de início e fim'); return; }
-    const agora = new Date().toISOString();
-    if (planoEditando) {
-      const novo = Object.assign({}, planoEditando, dados, { registrado_em: agora });
-      remover('Planos', planoEditando.id); registrar('Planos', novo);
-      fecharFolha('folha-plano'); avisar('Plano salvo');
-    } else {
-      const p = Object.assign({ id: novoId(), aluno: '', registrado_em: agora }, dados);
-      registrar('Planos', p);
-      const origem = $('fpl-origem').value;
-      if (origem.indexOf('p:') === 0) copiarPlano(origem.slice(2), p);
-      else if (origem.indexOf('m:') === 0) copiarModelo(CAT.modelos[Number(origem.slice(2))], p);
-      fecharFolha('folha-plano'); avisar('Plano criado');
-      abrirPlano(p.id);
-    }
-    desenhar(); atualizarStatus(); sincronizar();
-  });
-  // cópia: primeiro os nomes dos dias, depois todos os exercícios (vão em lote para a planilha)
-  function copiarPlano(deId, para) {
-    const agora = new Date().toISOString();
-    estado.planoDias.filter((d) => d.plano_id === deId && d.dia <= para.dias)
-      .forEach((d) => registrar('Plano Dias', Object.assign({}, d, { id: novoId(), plano_id: para.id, registrado_em: agora })));
-    estado.planoItens.filter((i) => i.plano_id === deId && i.dia <= para.dias)
-      .forEach((i) => registrar('Plano Itens', Object.assign({}, i, { id: novoId(), plano_id: para.id, registrado_em: agora })));
-  }
-  function copiarModelo(m, para) {
-    const agora = new Date().toISOString();
-    m.dias.slice(0, para.dias).forEach((itens, d) => itens.forEach((it, k) => registrar('Plano Itens', {
-      id: novoId(), plano_id: para.id, dia: d + 1, ordem: k + 1, exercicio: it[0], series: it[1], repeticoes: it[2], tecnica: it[3],
-      carga: '', descanso: '', obs: '', registrado_em: agora,
-    })));
-  }
-  $('fpl-duplicar').onclick = () => { const id = planoEditando.id; fecharFolha('folha-plano'); abrirFolhaPlano(null, id); };
-  $('fpl-apagar').onclick = () => {
-    const p = planoEditando;
-    if (!confirm('Apagar o plano "' + p.nome + '" e todos os exercícios dele?')) return;
-    estado.planoItens.filter((i) => i.plano_id === p.id).forEach((i) => remover('Plano Itens', i.id));
-    estado.planoDias.filter((d) => d.plano_id === p.id).forEach((d) => remover('Plano Dias', d.id));
-    remover('Planos', p.id);
-    fecharFolha('folha-plano'); avisar('Plano apagado'); irPara('cad-treino'); atualizarStatus(); sincronizar();
-  };
-
-  // ----- editor do plano -----
-  function chipsDias(box, p, atual, aoEscolher, marca) {
-    box.innerHTML = '';
-    for (let d = 1; d <= p.dias; d++) {
-      const b = el('button', marca === d ? 'sugerido' : ''); b.type = 'button';
-      b.setAttribute('aria-pressed', String(d === atual));
-      b.appendChild(el('b', '', 'Dia ' + d)); b.appendChild(el('span', '', nomeDia(p.id, d)));
-      b.onclick = () => aoEscolher(d); box.appendChild(b);
-    }
-  }
-  function desenharPlano() {
-    const p = plano(planoAberto);
-    if (!p) { irPara('cad-treino'); return; }
-    if (diaAberto > p.dias) diaAberto = 1;
-    $('titulo-secao').textContent = p.nome;
-    $('pe-nome').textContent = statusPlano(p).replace(/^./, (c) => c.toUpperCase());
-    $('pe-datas').textContent = fmtData(p.inicio) + ' a ' + fmtData(p.fim) + (p.objetivo ? ' · ' + p.objetivo : '') + (p.obs ? ' · ' + p.obs : '');
-    chipsDias($('pe-dias'), p, diaAberto, (d) => { diaAberto = d; desenharPlano(); });
-    const r = registroDoDia(p.id, diaAberto);
-    if (document.activeElement !== $('pe-dia-nome')) $('pe-dia-nome').value = (r && r.nome) || '';
-    $('pe-dia-nome').placeholder = 'Nome do dia ' + diaAberto + (nomeAutomatico(p.id, diaAberto) ? ' (ex.: ' + nomeAutomatico(p.id, diaAberto) + ')' : ' (ex.: Peito e tríceps)');
-    desenharItens($('pe-lista'), itensDoDia(p.id, diaAberto), 'editar');
-  }
-  $('pe-editar').onclick = () => abrirFolhaPlano(planoAberto);
-  $('pe-dia-nome').addEventListener('change', () => {
-    const r = registroDoDia(planoAberto, diaAberto);
-    if (r) remover('Plano Dias', r.id);
-    const nome = $('pe-dia-nome').value.trim();
-    if (nome) registrar('Plano Dias', { id: novoId(), plano_id: planoAberto, dia: diaAberto, nome, registrado_em: new Date().toISOString() });
+    if (treinoEditando) remover('Treinos', treinoEditando.id);
+    registrar('Treinos', t);
+    avisar((treinoEditando ? 'Treino atualizado: ' : '') + atividade + ' · ' + min + ' min');
+    salvoEscolhido = null; limparFormTreino();
     desenhar(); atualizarStatus(); sincronizar();
   });
 
-  // ----- escolher exercícios (janela) -----
-  let pickerGrupo = '';
-  let pickerCat = '';
-  let pickerAdicionados = 0;
-  $('pe-add').onclick = () => {
-    pickerAdicionados = 0;
-    // começa filtrando pelo grupo mais usado no dia (ou todos)
-    const gs = itensDoDia(planoAberto, diaAberto).map((i) => exercicio(i.exercicio).grupo);
-    pickerGrupo = gs.length ? gs[gs.length - 1] : ''; pickerCat = '';
-    $('fp-busca').value = '';
-    $('fp-titulo').textContent = 'Dia ' + diaAberto + ': adicionar exercícios';
-    $('fp-info').textContent = 'Toque para adicionar ao dia. Pode escolher vários.';
-    desenharPicker(); abrirFolha('folha-picker');
-  };
-  function desenharPicker() {
-    // ao digitar, procura em todos os grupos
-    const grupo = $('fp-busca').value.trim() ? '' : pickerGrupo;
-    if (!grupo) pickerCat = '';
-    chipsGrupos($('fp-grupos'), grupo, (g) => { pickerGrupo = g; pickerCat = ''; $('fp-busca').value = ''; desenharPicker(); });
-    chipsCategorias($('fp-cats'), grupo, pickerCat, (c) => { pickerCat = c; desenharPicker(); });
-    const ul = $('fp-lista'); ul.innerHTML = '';
-    const lista = filtrarExercicios($('fp-busca').value, grupo, pickerCat);
-    if (!lista.length) ul.appendChild(el('li', 'vazio', 'Nada encontrado. Você pode criar o exercício em Cadastro › Exercício.'));
-    lista.slice(0, 150).forEach((e) => {
-      const mais = el('span', 'mais-ex', '+');
-      const li = linhaExercicio(e, mais);
-      li.onclick = () => {
-        const itens = itensDoDia(planoAberto, diaAberto);
-        const tec = $('fp-tecnica').value;
-        registrar('Plano Itens', {
-          id: novoId(), plano_id: planoAberto, dia: diaAberto, ordem: itens.length ? itens[itens.length - 1].ordem + 1 : 1,
-          exercicio: e.id, series: Number($('fp-series').value) || '', repeticoes: $('fp-reps').value.trim(), tecnica: tec,
-          carga: '', descanso: '', obs: '', registrado_em: new Date().toISOString(),
-        });
-        pickerAdicionados++;
-        li.classList.add('adicionado'); mais.textContent = '✓';
-        $('fp-info').textContent = pickerAdicionados + ' adicionado(s): ' + nomeExercicio(e);
-        desenhar(); atualizarStatus();
+  // treinos salvos (Cadastro › Treino): um toque preenche o formulário
+  let salvoEscolhido = null;
+  function desenharSalvos() {
+    const box = $('t-salvos'); box.innerHTML = '';
+    const ms = estado.meusTreinos.slice().sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    box.classList.toggle('escondido', !ms.length || !!treinoEditando);
+    ms.forEach((m) => {
+      const b = el('button', '', m.nome); b.type = 'button'; b.setAttribute('aria-pressed', String(salvoEscolhido === m.id));
+      b.onclick = () => {
+        salvoEscolhido = m.id;
+        preencherFormTreino({ atividade: m.atividade, minutos: m.minutos, local: m.local, obs: m.obs, dia: hoje() });
+        const d = new Date(); $('t-hora').value = dd(d.getHours()) + ':' + dd(d.getMinutes());
+        desenharSalvos();
       };
-      ul.appendChild(li);
+      box.appendChild(b);
     });
-    if (lista.length > 150) ul.appendChild(el('li', 'vazio', 'Mostrando 150 de ' + lista.length + '. Refine a busca.'));
-  }
-  $('fp-busca').addEventListener('input', desenharPicker);
-  $('fp-tecnica').addEventListener('change', () => { if ($('fp-tecnica').value === 'Aeróbico') { $('fp-reps').value = '30 min'; $('fp-series').value = ''; } });
-  $('fp-fechar').onclick = () => { fecharFolha('folha-picker'); sincronizar(); };
-
-  // ----- editar um exercício do plano (janela) -----
-  let itemEditando = null;
-  function abrirItem(i) {
-    itemEditando = i;
-    const e = exercicio(i.exercicio);
-    $('fi-nome').textContent = nomeExercicio(e);
-    $('fi-det').textContent = detalheExercicio(e);
-    $('fi-series').value = i.series === '' ? '' : String(i.series);
-    $('fi-reps').value = i.repeticoes || ''; $('fi-tecnica').value = TECNICAS.indexOf(i.tecnica) >= 0 ? i.tecnica : 'Comum';
-    $('fi-carga').value = i.carga || ''; $('fi-descanso').value = i.descanso || ''; $('fi-obs').value = i.obs || '';
-    $('fi-tec-desc').textContent = DESC_TECNICA[$('fi-tecnica').value] || '';
-    abrirFolha('folha-item');
-  }
-  $('fi-tecnica').addEventListener('change', () => { $('fi-tec-desc').textContent = DESC_TECNICA[$('fi-tecnica').value] || ''; });
-  $('fi-fechar').onclick = () => fecharFolha('folha-item');
-  $('form-item').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const n = Object.assign({}, itemEditando, {
-      series: Number($('fi-series').value) || '', repeticoes: $('fi-reps').value.trim(), tecnica: $('fi-tecnica').value,
-      carga: $('fi-carga').value.trim(), descanso: $('fi-descanso').value.trim(), obs: $('fi-obs').value.trim(), registrado_em: new Date().toISOString(),
-    });
-    remover('Plano Itens', itemEditando.id); registrar('Plano Itens', n);
-    fecharFolha('folha-item'); desenhar(); atualizarStatus(); sincronizar();
-  });
-  $('fi-remover').onclick = () => {
-    remover('Plano Itens', itemEditando.id);
-    fecharFolha('folha-item'); desenhar(); atualizarStatus(); avisar('Exercício removido'); sincronizar();
-  };
-
-  // ---------- Treino de hoje (registro diário) ----------
-  const idTreinoPlano = (pid, dia) => pid + '#' + dia;
-  let diaHoje = null; // dia do plano escolhido na tela de hoje
-  function diaSugerido(p) {
-    const feitos = estado.treinos.filter((t) => String(t.treino_id).indexOf(p.id + '#') === 0)
-      .sort((a, b) => (a.dia + a.registrado_em < b.dia + b.registrado_em ? -1 : 1));
-    if (!feitos.length) return 1;
-    const ult = feitos[feitos.length - 1];
-    const d = Number(String(ult.treino_id).split('#')[1]) || 0;
-    return ult.dia === hoje() ? d : (d % p.dias) + 1;
-  }
-  const chaveFeitos = () => 'shape-feitos-' + hoje();
-  function marcarFeito(id) {
-    const f = guardar.ler(chaveFeitos(), []);
-    const k = f.indexOf(id); if (k >= 0) f.splice(k, 1); else f.push(id);
-    guardar.gravar(chaveFeitos(), f); desenharTreinos();
-  }
-  function desenharTreinoHoje() {
-    const p = planoAtual();
-    $('hp-card').classList.toggle('escondido', !p);
-    $('hp-sem-plano').classList.toggle('escondido', !!p);
-    $('hp-plano').textContent = p ? p.nome : '';
-    if (!p) return;
-    const sug = diaSugerido(p);
-    if (!diaHoje || diaHoje > p.dias) diaHoje = sug;
-    chipsDias($('hp-dias'), p, diaHoje, (d) => { diaHoje = d; desenharTreinos(); }, sug);
-    $('hp-titulo').textContent = 'Dia ' + diaHoje + ' · ' + nomeDia(p.id, diaHoje);
-    const itens = itensDoDia(p.id, diaHoje);
-    desenharItens($('hp-lista'), itens, 'hoje', guardar.ler(chaveFeitos(), []));
-    const feito = estado.treinos.find((t) => t.dia === hoje() && t.treino_id === idTreinoPlano(p.id, diaHoje));
-    $('hp-feito').textContent = feito ? '✓ Treino registrado hoje: ' + feito.minutos + ' min.' : 'Toque nos exercícios para marcar o que já fez.';
-    $('hp-concluir').textContent = feito ? 'Registrar de novo' : 'Concluí';
-  }
-  $('hp-concluir').onclick = () => {
-    const p = planoAtual(); if (!p) return;
-    const min = Math.round(Number($('hp-minutos').value));
-    if (!(min >= 1 && min <= 600)) { avisar('Informe quantos minutos durou o treino'); $('hp-minutos').focus(); return; }
-    const itens = itensDoDia(p.id, diaHoje);
-    const cardio = itens.length && itens.some((i) => exercicio(i.exercicio).grupo === 'Aeróbico');
-    registrar('Treinos', { id: novoId(), dia: hoje(), tipo: cardio ? 'cardio' : 'musculacao', minutos: min, registrado_em: new Date().toISOString(), treino_id: idTreinoPlano(p.id, diaHoje) });
-    $('hp-minutos').value = '';
-    desenhar(); atualizarStatus(); avisar('Treino do dia ' + diaHoje + ' registrado: ' + min + ' min'); sincronizar();
-  };
-  function nomeTreinoRegistrado(t) {
-    if (!t.treino_id || String(t.treino_id).indexOf('#') < 0) return '';
-    const [pid, d] = String(t.treino_id).split('#');
-    return plano(pid) ? 'Dia ' + d + ' · ' + nomeDia(pid, Number(d)) : '';
   }
 
+  function inicioSemana(dia) { const d = new Date(dia + 'T12:00:00'); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return iso(d); }
   function desenharTreinos() {
-    desenharTreinoHoje();
-    if (!$('t-dia').value) $('t-dia').value = hoje();
+    if (!$('t-dia').value) limparFormTreino();
     $('t-dia').max = hoje();
+    desenharSalvos();
+    // resumo da semana (segunda a domingo)
+    const ini = inicioSemana(hoje());
+    const sem = estado.treinos.filter((t) => t.dia >= ini && t.dia <= hoje());
+    const soma = (c) => sem.reduce((s, t) => s + (Number(t[c]) || 0), 0);
+    $('ts-qtd').textContent = sem.length; $('ts-min').textContent = num(soma('minutos'));
+    $('ts-kcal').textContent = num(soma('kcal_ativas')); $('ts-km').textContent = num(soma('distancia_km'), 1);
+
     const lista = $('lista-treinos'); lista.innerHTML = '';
-    const ts = estado.treinos.slice().sort((a, b) => (a.dia + a.registrado_em < b.dia + b.registrado_em ? 1 : -1)).slice(0, 15);
+    const ts = estado.treinos.slice().sort((a, b) => ((a.dia + (a.hora || '') + a.registrado_em) < (b.dia + (b.hora || '') + b.registrado_em) ? 1 : -1)).slice(0, 20);
     if (!ts.length) lista.appendChild(el('li', 'vazio', 'Nenhum treino registrado ainda.'));
     ts.forEach((t) => {
-      const li = el('li');
+      const li = el('li', 'item-clica');
       const d = el('div', 'item-txt');
-      const nome = nomeTreinoRegistrado(t);
-      d.appendChild(el('span', 'ml', (nome || TIPOS_TREINO[t.tipo] || t.tipo) + ' · ' + t.minutos + ' min'));
-      d.appendChild(el('small', '', (t.dia === hoje() ? 'hoje' : t.dia === somaDias(hoje(), -1) ? 'ontem' : semanaDe(t.dia) + ' ' + diaCurto(t.dia)) + (nome ? ' · ' + (TIPOS_TREINO[t.tipo] || t.tipo) : '')));
+      d.appendChild(el('span', 'ml', nomeAtividade(t) + (t.local ? ' · ' + t.local.toLowerCase() : '')));
+      const quando = (t.dia === hoje() ? 'hoje' : t.dia === somaDias(hoje(), -1) ? 'ontem' : semanaDe(t.dia) + ' ' + diaCurto(t.dia)) + (t.hora ? ' ' + t.hora : '');
+      d.appendChild(el('small', '', [quando, t.minutos + ' min', t.kcal_ativas !== '' && t.kcal_ativas !== undefined ? num(t.kcal_ativas) + ' kcal' : '',
+        t.distancia_km ? num(t.distancia_km, 2) + ' km' : '', t.fc_media ? t.fc_media + ' bpm' : '', t.esforco ? 'esforço ' + t.esforco : ''].filter(Boolean).join(' · ')));
+      if (t.obs) d.appendChild(el('small', 'obs-ex', t.obs));
       li.appendChild(d);
+      li.onclick = () => {
+        treinoEditando = t; salvoEscolhido = null; preencherFormTreino(t);
+        $('t-rotulo-form').textContent = 'Editar treino'; $('t-salvar').textContent = 'Salvar alterações';
+        $('t-cancelar').classList.remove('escondido'); desenharSalvos();
+        $('t-rotulo-form').scrollIntoView({ behavior: 'smooth' });
+      };
       const b = el('button', '', '✕'); b.setAttribute('aria-label', 'Apagar treino');
-      b.onclick = () => {
-        if (!confirm('Apagar ' + (TIPOS_TREINO[t.tipo] || t.tipo) + ' de ' + t.minutos + ' min (' + diaCurto(t.dia) + ')?')) return;
+      b.onclick = (ev) => {
+        ev.stopPropagation();
+        if (!confirm('Apagar ' + nomeAtividade(t) + ' de ' + t.minutos + ' min (' + diaCurto(t.dia) + ')?')) return;
+        if (treinoEditando && treinoEditando.id === t.id) limparFormTreino();
         remover('Treinos', t.id); desenhar(); atualizarStatus(); avisar('Treino apagado'); sincronizar();
       };
       li.appendChild(b);
@@ -953,42 +596,18 @@
     });
   }
 
-  // ----- biblioteca na tela de cadastro de exercícios -----
-  let bibGrupo = '';
-  let bibCat = '';
-  function desenharBiblioteca() {
-    const mostrar = secao === 'cad-exercicio';
-    $('cad-biblioteca').classList.toggle('escondido', !mostrar);
-    if (!mostrar) return;
-    $('bib-qtd').textContent = Object.keys(BIB).length + ' exercícios prontos';
-    const ul = $('bib-lista'); ul.innerHTML = '';
-    const grupo = $('bib-busca').value.trim() ? '' : bibGrupo;
-    if (!grupo) bibCat = '';
-    chipsGrupos($('bib-grupos'), grupo, (g) => { bibGrupo = g; bibCat = ''; $('bib-busca').value = ''; desenharBiblioteca(); });
-    chipsCategorias($('bib-cats'), grupo, bibCat, (c) => { bibCat = c; desenharBiblioteca(); });
-    const lista = filtrarExercicios($('bib-busca').value, grupo, bibCat).filter((e) => !e.meu);
-    lista.slice(0, 120).forEach((e) => ul.appendChild(linhaExercicio(e)));
-    if (lista.length > 120) ul.appendChild(el('li', 'vazio', 'Mostrando 120 de ' + lista.length + '. Use a busca ou os grupos.'));
-    if (!lista.length) ul.appendChild(el('li', 'vazio', 'Nada encontrado.'));
-  }
-  $('bib-busca').addEventListener('input', desenharBiblioteca);
-
   // ---------- Cadastros ----------
-  const GRUPOS = GRUPOS_MUSC;
   const HORARIOS = ['Ao acordar', 'Café da manhã', 'Almoço', 'Pré-treino', 'Pós-treino', 'Tarde', 'Jantar', 'Antes de dormir'];
   const CADASTROS = {
-    'cad-exercicio': { tabela: 'Cad Exercicios', novo: 'Novo exercício', lista: 'Exercícios cadastrados', vazio: 'Nenhum exercício cadastrado ainda.',
+    'cad-treino': { tabela: 'Meus Treinos', novo: 'Novo treino', lista: 'Treinos salvos', vazio: 'Nenhum treino salvo ainda. Ex.: "Treino A – peito", "Corrida 5 km".',
       campos: [
-        { c: 'nome', rot: 'Nome do exercício', ph: 'ex.: Supino', obrig: true },
-        { c: 'grupo', rot: 'Grupo muscular', ops: GRUPOS, obrig: true },
-        { c: 'categoria', rot: 'Categoria no grupo', ops: ['A', 'B', 'C', 'D'] },
-        { c: 'variacao', rot: 'Variação / posição', ph: 'ex.: Inclinado' },
-        { c: 'pegada', rot: 'Pegada', ops: ['Pronada', 'Supinada', 'Neutra'] },
-        { c: 'equipamento', rot: 'Equipamento', ph: 'ex.: Banco + Halteres' },
-        { c: 'nivel', rot: 'Nível', ops: ['Iniciante', 'Intermediário', 'Avançado'] },
+        { c: 'nome', rot: 'Nome', ph: 'ex.: Treino A – peito e tríceps', obrig: true },
+        { c: 'atividade', rot: 'Atividade', ops: NOMES_ATIV, obrig: true },
+        { c: 'minutos', rot: 'Duração de costume (min)', num: true },
+        { c: 'local', rot: 'Local', ops: ['Interno', 'Externo'] },
         { c: 'obs', rot: 'Observação', ph: 'opcional' },
       ],
-      resumo: (i) => detalheExercicio(i) },
+      resumo: (i) => [i.atividade, i.minutos ? i.minutos + ' min' : '', i.local].filter(Boolean).join(' · ') },
     'cad-alimento': { tabela: 'Cad Alimentos', novo: 'Novo alimento', lista: 'Alimentos cadastrados', vazio: 'Nenhum alimento cadastrado ainda.',
       campos: [
         { c: 'nome', rot: 'Alimento', ph: 'ex.: Arroz integral', obrig: true },
@@ -1289,8 +908,8 @@
     $('b-agua').textContent = Math.round(tot).toLocaleString('pt-BR') + ' / ' + fmt(m.recomendada);
     $('b-agua-barra').style.width = Math.min(100, m.recomendada ? (tot / m.recomendada) * 100 : 0) + '%';
     const a = adicionalPorTreino(hoje());
-    const p = planoAtual();
-    $('b-treino').textContent = a.treinos.length ? '✓ ' + a.minutos + ' min hoje' : p ? 'Dia ' + diaSugerido(p) + ' · ' + nomeDia(p.id, diaSugerido(p)) : 'sem plano';
+    const nsem = estado.treinos.filter((t) => t.dia >= inicioSemana(hoje())).length;
+    $('b-treino').textContent = a.treinos.length ? '✓ ' + a.minutos + ' min hoje' : nsem ? nsem + ' na semana' : 'nada hoje';
   }
 
   // ---------- Painel ----------
@@ -1492,9 +1111,7 @@
     else if (secao === 'hidratacao') desenharHidratacao();
     else if (secao === 'treino') desenharTreinos();
     else if (secao === 'perfil') preencherPerfil();
-    else if (secao === 'cad-treino') desenharPlanos();
-    else if (secao === 'plano') desenharPlano();
-    else if (CADASTROS[secao]) { desenharCadastro(); desenharBiblioteca(); }
+    else if (CADASTROS[secao]) desenharCadastro();
   }
 
   document.addEventListener('visibilitychange', () => {
@@ -1541,6 +1158,25 @@
     if (ret && ret.ok) guardar.apagar('shape-renovou');
     if (tokenValido() || conta) abrirApp(); else mostrar('login');
   })();
+
+  // Menu de baixo sempre colado no fim da tela.
+  // No app instalado do iPhone, ao abrir, o iOS às vezes calcula a altura da tela sem a barra de status
+  // e o menu "flutua" um pouco acima do fim (só se corrige depois de rolar a página, e a tela inicial não rola).
+  function colarMenu() {
+    const menu = document.querySelector('.menu');
+    if (!menu || $('tela-app').classList.contains('escondido') || getComputedStyle(menu).bottom !== '0px' || window.innerWidth >= 820) { if (menu) menu.style.transform = ''; return; }
+    menu.style.transform = '';
+    let alturaTela = window.innerHeight;
+    if (navigator.standalone) {
+      const retrato = window.matchMedia('(orientation: portrait)').matches;
+      alturaTela = Math.max(alturaTela, retrato ? screen.height : screen.width);
+    }
+    const sobra = Math.round(alturaTela - menu.getBoundingClientRect().bottom);
+    if (sobra > 1 && sobra < 120) menu.style.transform = 'translateY(' + sobra + 'px)';
+  }
+  ['resize', 'orientationchange', 'pageshow', 'load'].forEach((ev) => window.addEventListener(ev, () => setTimeout(colarMenu, 60)));
+  window.addEventListener('scroll', colarMenu, { passive: true });
+  document.addEventListener('visibilitychange', () => setTimeout(colarMenu, 60));
 
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
     navigator.serviceWorker.register('sw.js').catch(() => {});
