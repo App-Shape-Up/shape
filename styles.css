@@ -365,3 +365,8 @@ body.com-folha { overflow: hidden; }
 button.perigo { color: var(--danger); }
 .item-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .item-txt small { color: var(--muted); font-size: 13px; }
+.chips-cats { padding-top: 0; }
+.chips-cats button.chip-cat { display: flex; align-items: center; gap: 6px; border-radius: 12px; max-width: 210px; }
+.chip-cat b { color: var(--text); }
+.chip-cat span { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chips-cats button[aria-pressed="true"] b { color: var(--accent); }

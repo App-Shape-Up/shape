@@ -22,7 +22,7 @@
     Perfil:  ['id', 'idade', 'peso_kg', 'altura_cm', 'tempo_treino', 'condicionamento', 'objetivo', 'registrado_em'],
     Treinos: ['id', 'dia', 'tipo', 'minutos', 'registrado_em', 'treino_id'],
     // Cadastros (a pessoa monta uma vez e usa no dia a dia)
-    'Cad Exercicios':  ['id', 'nome', 'grupo', 'obs', 'registrado_em', 'variacao', 'pegada', 'equipamento', 'nivel'],
+    'Cad Exercicios':  ['id', 'nome', 'grupo', 'obs', 'registrado_em', 'variacao', 'pegada', 'equipamento', 'nivel', 'categoria'],
     'Cad Alimentos':   ['id', 'nome', 'porcao', 'kcal', 'proteina_g', 'carbo_g', 'gordura_g', 'registrado_em'],
     'Cad Suplementos': ['id', 'nome', 'dose', 'horario', 'obs', 'registrado_em'],
     // Planos de treino (periodização): um plano tem N dias (normalmente 7), cada dia tem uma lista de exercícios.
@@ -487,7 +487,7 @@
   // ---------- Biblioteca de exercícios e técnicas ----------
   const CAT = window.SHAPE_CATALOGO || { exercicios: [], tecnicas: [], modelos: [] };
   const BIB = {};
-  CAT.exercicios.forEach((r) => { BIB[r[0]] = { id: r[0], grupo: r[1], nome: r[2], variacao: r[3], pegada: r[4], equipamento: r[5], nivel: r[6], bib: true }; });
+  CAT.exercicios.forEach((r) => { BIB[r[0]] = { id: r[0], grupo: r[1], nome: r[2], variacao: r[3], pegada: r[4], equipamento: r[5], nivel: r[6], categoria: r[7] || '', bib: true }; });
   const GRUPOS_MUSC = [];
   CAT.exercicios.forEach((r) => { if (GRUPOS_MUSC.indexOf(r[1]) < 0) GRUPOS_MUSC.push(r[1]); });
   const TECNICAS = CAT.tecnicas.map((t) => t[0]);
@@ -502,20 +502,26 @@
     return [e.grupo, e.pegada ? 'pegada ' + e.pegada.toLowerCase() : '', e.equipamento].filter(Boolean).join(' · ');
   }
   const semAcento = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-  function filtrarExercicios(busca, grupo) {
+  // Categoria = subdivisão do exercício dentro do grupo muscular (ex.: Dorsal A = remadas, B = puxadas)
+  const CATEGORIAS = CAT.categorias || {};
+  const categoriasDo = (grupo) => Object.keys(CATEGORIAS).filter((k) => k.split('|')[0] === grupo).map((k) => k.split('|')[1]).sort();
+  function filtrarExercicios(busca, grupo, categoria) {
     const palavras = semAcento(busca).split(/\s+/).filter(Boolean);
     return todosExercicios().filter((e) => {
       if (grupo && e.grupo !== grupo) return false;
+      if (categoria && e.categoria !== categoria) return false;
       if (!palavras.length) return true;
       const t = semAcento([e.grupo, e.nome, e.variacao, e.pegada, e.equipamento, e.nivel].join(' '));
       return palavras.every((p) => t.indexOf(p) >= 0);
-    }).sort((x, y) => (x.meu === y.meu ? 0 : x.meu ? -1 : 1) || GRUPOS_MUSC.indexOf(x.grupo) - GRUPOS_MUSC.indexOf(y.grupo) || x.nome.localeCompare(y.nome, 'pt-BR'));
+    }).sort((x, y) => (x.meu === y.meu ? 0 : x.meu ? -1 : 1) || GRUPOS_MUSC.indexOf(x.grupo) - GRUPOS_MUSC.indexOf(y.grupo) || String(x.categoria || 'Z').localeCompare(String(y.categoria || 'Z')) || x.nome.localeCompare(y.nome, 'pt-BR'));
   }
   function linhaExercicio(e, extra) {
     const li = el('li', 'item-bib');
     const t = el('div', 'item-txt');
     const n = el('span', 'ml', nomeExercicio(e)); if (e.meu) n.appendChild(el('i', 'selo', 'meu'));
-    t.appendChild(n); t.appendChild(el('small', '', [detalheExercicio(e), e.nivel].filter(Boolean).join(' · ')));
+    t.appendChild(n);
+    const det = [detalheExercicio(e), e.nivel].filter(Boolean).join(' · ');
+    t.appendChild(el('small', '', e.categoria ? det.replace(e.grupo, e.grupo + ' ' + e.categoria) : det));
     li.appendChild(t); if (extra) li.appendChild(extra);
     return li;
   }
@@ -524,6 +530,18 @@
     [''].concat(GRUPOS_MUSC).forEach((g) => {
       const b = el('button', '', g || 'Todos'); b.type = 'button'; b.setAttribute('aria-pressed', String(g === atual));
       b.onclick = () => aoEscolher(g); box.appendChild(b);
+    });
+  }
+  // segunda linha de botões: categorias do grupo escolhido
+  function chipsCategorias(box, grupo, atual, aoEscolher) {
+    box.innerHTML = '';
+    const cs = grupo ? categoriasDo(grupo) : [];
+    box.classList.toggle('escondido', cs.length < 2);
+    if (cs.length < 2) return;
+    [''].concat(cs).forEach((c) => {
+      const b = el('button', 'chip-cat'); b.type = 'button'; b.setAttribute('aria-pressed', String(c === atual));
+      if (c) { b.appendChild(el('b', '', c)); b.appendChild(el('span', '', CATEGORIAS[grupo + '|' + c] || '')); } else b.textContent = 'Todas';
+      b.onclick = () => aoEscolher(c); box.appendChild(b);
     });
   }
   function preencherTecnicas(sel) { sel.innerHTML = ''; TECNICAS.forEach((t) => sel.appendChild(el('option', '', t))); }
@@ -788,12 +806,13 @@
 
   // ----- escolher exercícios (janela) -----
   let pickerGrupo = '';
+  let pickerCat = '';
   let pickerAdicionados = 0;
   $('pe-add').onclick = () => {
     pickerAdicionados = 0;
     // começa filtrando pelo grupo mais usado no dia (ou todos)
     const gs = itensDoDia(planoAberto, diaAberto).map((i) => exercicio(i.exercicio).grupo);
-    pickerGrupo = gs.length ? gs[gs.length - 1] : '';
+    pickerGrupo = gs.length ? gs[gs.length - 1] : ''; pickerCat = '';
     $('fp-busca').value = '';
     $('fp-titulo').textContent = 'Dia ' + diaAberto + ': adicionar exercícios';
     $('fp-info').textContent = 'Toque para adicionar ao dia. Pode escolher vários.';
@@ -802,9 +821,11 @@
   function desenharPicker() {
     // ao digitar, procura em todos os grupos
     const grupo = $('fp-busca').value.trim() ? '' : pickerGrupo;
-    chipsGrupos($('fp-grupos'), grupo, (g) => { pickerGrupo = g; $('fp-busca').value = ''; desenharPicker(); });
+    if (!grupo) pickerCat = '';
+    chipsGrupos($('fp-grupos'), grupo, (g) => { pickerGrupo = g; pickerCat = ''; $('fp-busca').value = ''; desenharPicker(); });
+    chipsCategorias($('fp-cats'), grupo, pickerCat, (c) => { pickerCat = c; desenharPicker(); });
     const ul = $('fp-lista'); ul.innerHTML = '';
-    const lista = filtrarExercicios($('fp-busca').value, grupo);
+    const lista = filtrarExercicios($('fp-busca').value, grupo, pickerCat);
     if (!lista.length) ul.appendChild(el('li', 'vazio', 'Nada encontrado. Você pode criar o exercício em Cadastro › Exercício.'));
     lista.slice(0, 150).forEach((e) => {
       const mais = el('span', 'mais-ex', '+');
@@ -934,6 +955,7 @@
 
   // ----- biblioteca na tela de cadastro de exercícios -----
   let bibGrupo = '';
+  let bibCat = '';
   function desenharBiblioteca() {
     const mostrar = secao === 'cad-exercicio';
     $('cad-biblioteca').classList.toggle('escondido', !mostrar);
@@ -941,8 +963,10 @@
     $('bib-qtd').textContent = Object.keys(BIB).length + ' exercícios prontos';
     const ul = $('bib-lista'); ul.innerHTML = '';
     const grupo = $('bib-busca').value.trim() ? '' : bibGrupo;
-    chipsGrupos($('bib-grupos'), grupo, (g) => { bibGrupo = g; $('bib-busca').value = ''; desenharBiblioteca(); });
-    const lista = filtrarExercicios($('bib-busca').value, grupo).filter((e) => !e.meu);
+    if (!grupo) bibCat = '';
+    chipsGrupos($('bib-grupos'), grupo, (g) => { bibGrupo = g; bibCat = ''; $('bib-busca').value = ''; desenharBiblioteca(); });
+    chipsCategorias($('bib-cats'), grupo, bibCat, (c) => { bibCat = c; desenharBiblioteca(); });
+    const lista = filtrarExercicios($('bib-busca').value, grupo, bibCat).filter((e) => !e.meu);
     lista.slice(0, 120).forEach((e) => ul.appendChild(linhaExercicio(e)));
     if (lista.length > 120) ul.appendChild(el('li', 'vazio', 'Mostrando 120 de ' + lista.length + '. Use a busca ou os grupos.'));
     if (!lista.length) ul.appendChild(el('li', 'vazio', 'Nada encontrado.'));
@@ -957,6 +981,7 @@
       campos: [
         { c: 'nome', rot: 'Nome do exercício', ph: 'ex.: Supino', obrig: true },
         { c: 'grupo', rot: 'Grupo muscular', ops: GRUPOS, obrig: true },
+        { c: 'categoria', rot: 'Categoria no grupo', ops: ['A', 'B', 'C', 'D'] },
         { c: 'variacao', rot: 'Variação / posição', ph: 'ex.: Inclinado' },
         { c: 'pegada', rot: 'Pegada', ops: ['Pronada', 'Supinada', 'Neutra'] },
         { c: 'equipamento', rot: 'Equipamento', ph: 'ex.: Banco + Halteres' },

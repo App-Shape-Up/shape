@@ -1,5 +1,5 @@
 // Guarda os arquivos do app para abrir rápido. Sempre tenta a versão nova primeiro.
-const CACHE = 'shapeup-v6-planos-treino';
+const CACHE = 'shapeup-v6b-categorias';
 const ARQUIVOS = ['./', 'index.html', 'styles.css', 'app.js', 'config.js', 'catalogo.js', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-180.png'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ARQUIVOS))); self.skipWaiting(); });
 self.addEventListener('activate', (e) => {
