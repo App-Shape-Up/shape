@@ -322,3 +322,13 @@ button.perigo { color: var(--danger); }
 .esforco button[aria-checked="true"].e2 { background: #b8a11f; color: #08100b; border-color: #b8a11f; }
 .esforco button[aria-checked="true"].e3 { background: #e0782a; color: #08100b; border-color: #e0782a; }
 .esforco button[aria-checked="true"].e4 { background: #e04848; color: #fff; border-color: #e04848; }
+
+/* ===== aviso de nova versão ===== */
+.nova-versao {
+  position: fixed; left: 12px; right: 12px; top: calc(10px + env(safe-area-inset-top)); z-index: 30;
+  display: flex; align-items: center; gap: 12px; justify-content: space-between;
+  background: #e9f2eb; color: #08100b; padding: 10px 10px 10px 16px; border-radius: 14px;
+  font-size: 15px; font-weight: 600; box-shadow: 0 6px 24px #0008;
+}
+.nova-versao button { background: var(--accent); color: #08100b; border: 0; border-radius: 10px; padding: 9px 14px; font-weight: 700; font-size: 14px; }
+@media (min-width: 820px) { .nova-versao { left: auto; right: 24px; width: 340px; } }

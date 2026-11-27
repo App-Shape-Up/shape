@@ -1180,6 +1180,19 @@
   document.addEventListener('visibilitychange', () => setTimeout(colarMenu, 60));
 
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    // Atualização automática: procura versão nova ao abrir/voltar para o app e a cada 30 min.
+    // Quando chega uma versão nova, mostra o aviso "Nova versão disponível — Atualizar".
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then((reg) => {
+      const procurar = () => reg.update().catch(() => {});
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') procurar(); });
+      window.addEventListener('focus', procurar);
+      setInterval(procurar, 30 * 60 * 1000);
+    }).catch(() => {});
+    let jaTinhaVersao = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (jaTinhaVersao) $('nova-versao').classList.remove('escondido');
+      jaTinhaVersao = true;
+    });
+    $('nv-atualizar').addEventListener('click', () => location.reload());
   }
 })();
